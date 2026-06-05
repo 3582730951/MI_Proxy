@@ -8,7 +8,7 @@
 </head>
 <body>
   <aside class="nav" aria-label="Primary">
-    <div class="brand"><span class="cube"></span><span>Sing-Box Pro</span><small>vNext 1.0.0</small></div>
+    <div class="brand"><span class="mark"></span><span>Sing-Box Pro</span><small>Operations</small></div>
     <a href="#overview">Overview</a>
     <a href="#nodes">Nodes</a>
     <a href="#routes">Routes &amp; Rules</a>
@@ -25,225 +25,139 @@
 
   <main>
     <header class="topbar">
-      <div class="crumb">Dashboard</div>
-      <div class="pill ok">All services running</div>
-      <div class="pill">Online 36d 23h</div>
-      <div class="pill">UTC+8 2025-05-28 23:41:52</div>
-      <label class="search"><span>Search</span><input value="" placeholder="node / domain / IP"></label>
-      <div class="avatar">A</div>
-      <div class="user">Admin<small>super admin</small></div>
-    </header>
-    <section id="overview" class="band">
-      <header class="toolbar">
-        <h1>Overview</h1>
-        <div class="status healthy">Healthy</div>
-      </header>
-      <div class="metric-grid" data-drilldown="overview">
-        <article><span>Online nodes</span><strong>984</strong><canvas data-chart="online"></canvas></article>
-        <article><span>Offline nodes</span><strong>16</strong><canvas data-chart="offline"></canvas></article>
-        <article><span>Alerts</span><strong>3</strong><canvas data-chart="alerts"></canvas></article>
-        <article><span>Total connections</span><strong>1.8M</strong><canvas data-chart="connections"></canvas></article>
-        <article><span>Active connections</span><strong>322K</strong><canvas data-chart="active"></canvas></article>
-        <article><span>New connection rate</span><strong>8.4K/s</strong><canvas data-chart="new-rate"></canvas></article>
-        <article><span>Total traffic</span><strong>42.8 TB</strong><canvas data-chart="traffic"></canvas></article>
-        <article><span>Up / Down</span><strong>1.2 / 8.7 Gbps</strong><canvas data-chart="bandwidth"></canvas></article>
-        <article><span>CPU / memory</span><strong>42% / 61%</strong><canvas data-chart="resource"></canvas></article>
-        <article><span>Disk / FD</span><strong>38% / 55%</strong><canvas data-chart="fd"></canvas></article>
-        <article><span>Network PPS</span><strong>620K</strong><canvas data-chart="pps"></canvas></article>
-        <article><span>99p API latency</span><strong>128 ms</strong><canvas data-chart="api"></canvas></article>
-        <article><span>Subscription latency</span><strong>182 ms</strong><canvas data-chart="sub-latency"></canvas></article>
-        <article><span>Config apply latency</span><strong>246 ms</strong><canvas data-chart="apply"></canvas></article>
-        <article><span>Capacity tier</span><strong>Medium</strong><canvas data-chart="capacity-tier"></canvas></article>
-        <article><span>Autoscaling recommendation</span><strong>3 API replicas</strong><canvas data-chart="autoscale"></canvas></article>
-        <article><span>Cost guardrail</span><strong>direct-first</strong><canvas data-chart="cost"></canvas></article>
+      <div>
+        <div class="crumb">Operations Dashboard</div>
+        <small id="lastUpdated">Waiting for live API data</small>
       </div>
+      <div id="connectionPill" class="pill warn">Disconnected</div>
+      <label class="search"><span>Search</span><input id="searchInput" autocomplete="off" placeholder="node / region / domain / IP"></label>
+      <button id="refreshButton" type="button" title="Refresh data">Refresh</button>
+      <button id="disconnectButton" type="button" title="Clear session">Disconnect</button>
+    </header>
+
+    <section id="session" class="band compact">
+      <header class="toolbar">
+        <h1>API Session</h1>
+        <div id="sessionStatus" class="status warn">Credentials required</div>
+      </header>
+      <form id="sessionForm" class="session-grid" autocomplete="off">
+        <label>API base URL<input id="apiBaseInput" name="apiBase" placeholder="/"></label>
+        <label>Auth mode<select id="authModeInput" name="authMode"><option value="bearer">Bearer token</option><option value="gateway">Trusted gateway headers</option></select></label>
+        <label class="auth-field auth-bearer">API token<input id="apiTokenInput" name="apiToken" type="password" autocomplete="off"></label>
+        <label class="auth-field auth-gateway">User ID<input id="userIdInput" name="userId" autocomplete="off"></label>
+        <label class="auth-field auth-gateway">Tenant ID<input id="tenantIdInput" name="tenantId" autocomplete="off"></label>
+        <label class="auth-field auth-gateway">Role<select id="roleInput" name="role"><option value="admin">admin</option><option value="operator">operator</option><option value="viewer">viewer</option></select></label>
+        <label class="auth-field auth-gateway">CSRF token<input id="csrfInput" name="csrfToken" autocomplete="off"></label>
+        <label class="auth-field auth-gateway">Confirmation token<input id="confirmInput" name="confirmationToken" autocomplete="off"></label>
+        <button type="submit">Connect</button>
+      </form>
+    </section>
+
+    <section id="overview" class="band">
+      <header class="toolbar"><h1>Overview</h1><div id="healthStatus" class="status">Unknown</div></header>
+      <div id="metricGrid" class="metric-grid"></div>
       <div class="overview-grid">
         <section class="panel topology">
-          <h2>Global Traffic Topology</h2>
-          <div class="world-map" aria-label="Global traffic topology">
-            <span class="node n1"></span><span class="node n2"></span><span class="node n3"></span><span class="node n4"></span><span class="node n5"></span>
-            <span class="arc a1"></span><span class="arc a2"></span><span class="arc a3"></span><span class="arc a4"></span>
-            <div class="map-legend"><b>Direct 46.7%</b><b>Proxy 48.2%</b><b>WARP 5.1%</b></div>
-          </div>
+          <header class="panel-head"><h2>Global Traffic Topology</h2><span id="mapSummary"></span></header>
+          <div id="trafficMap" class="world-map" aria-label="Live node topology map"></div>
         </section>
-        <section class="panel trend">
-          <h2>Traffic Trend</h2>
-          <canvas data-chart="traffic-trend"></canvas>
-        </section>
-        <section class="panel resources">
-          <h2>System Resources</h2>
-          <div class="rings"><span>CPU<strong>12.6%</strong></span><span>Memory<strong>28.4%</strong></span><span>Disk<strong>31.7%</strong></span></div>
-          <canvas data-chart="resource-mini"></canvas>
-        </section>
-        <section class="panel warp-mini">
-          <h2>WARP IP Pool</h2>
-          <table>
-            <tbody>
-              <tr><td>172.16.0.2</td><td>US</td><td>78 ms</td><td>98%</td></tr>
-              <tr><td>172.16.0.3</td><td>JP</td><td>56 ms</td><td>95%</td></tr>
-              <tr><td>172.16.0.4</td><td>SG</td><td>62 ms</td><td>93%</td></tr>
-            </tbody>
-          </table>
-        </section>
+        <section class="panel trend"><h2>Traffic Trend</h2><canvas id="trafficTrendChart"></canvas></section>
+        <section class="panel resources"><h2>System Resources</h2><div id="resourceRings" class="rings"></div><canvas id="resourceChart"></canvas></section>
+        <section class="panel warp-mini"><h2>WARP Exit Health</h2><div class="table-wrap"><table><thead><tr><th>Profile</th><th>Status</th><th>Latency</th><th>Loss</th></tr></thead><tbody id="exitQualityBody"></tbody></table></div></section>
       </div>
       <div class="split">
-        <section class="panel">
-          <h2>Exit Quality</h2>
-          <table>
-            <thead><tr><th>Exit</th><th>Latency</th><th>Loss</th><th>Error</th><th>Bandwidth</th></tr></thead>
-            <tbody>
-              <tr><td>warp-03</td><td>31 ms</td><td>0.1%</td><td>0.02%</td><td>1.8 Gbps</td></tr>
-              <tr><td>hk-proxy-02</td><td>42 ms</td><td>0.2%</td><td>0.04%</td><td>2.4 Gbps</td></tr>
-              <tr><td>sg-proxy-01</td><td>54 ms</td><td>0.3%</td><td>0.06%</td><td>1.1 Gbps</td></tr>
-            </tbody>
-          </table>
-        </section>
-        <section class="panel">
-          <h2>Recent Changes</h2>
-          <button title="Rollback selected deployment" class="icon-button">Rollback</button>
-          <ol>
-            <li>ruleset v42 published to 20%</li>
-            <li>warp-02 cooled down after probe failure</li>
-            <li>node hk-04 config rolled back to v19</li>
-          </ol>
-        </section>
+        <section class="panel"><h2>Capacity Plan</h2><div id="capacityPlan" class="stack"></div></section>
+        <section class="panel"><h2>Dependency Health</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>State</th><th>Message</th></tr></thead><tbody id="dependencyBody"></tbody></table></div></section>
       </div>
     </section>
 
     <section id="nodes" class="band">
       <h1>Nodes</h1>
       <div class="split">
-        <section class="panel"><h2>Region Distribution</h2><canvas data-chart="map"></canvas></section>
-        <section class="panel"><h2>Resource Timeline</h2><canvas data-chart="node-resource"></canvas></section>
+        <section class="panel"><h2>Region Distribution</h2><canvas id="regionChart"></canvas></section>
+        <section class="panel"><h2>Resource Timeline</h2><canvas id="nodeResourceChart"></canvas></section>
       </div>
-      <h2>Route Decision Audit</h2>
-      <table>
-        <thead><tr><th>Node</th><th>Region</th><th>sing-box</th><th>Restarts</th><th>Config</th><th>BBR</th><th>qdisc</th><th>FD</th><th>Ports</th></tr></thead>
-        <tbody>
-          <tr><td>hk-01</td><td>HK</td><td>running</td><td>1</td><td>v42</td><td>bbr</td><td>fq</td><td>42%</td><td>10000-65000</td></tr>
-          <tr><td>sg-02</td><td>SG</td><td>running</td><td>0</td><td>v42</td><td>bbr2</td><td>fq</td><td>35%</td><td>10000-65000</td></tr>
-        </tbody>
-      </table>
-      <section class="panel"><h2>Agent Logs &amp; Audit</h2><pre>node.apply_config ok version=42
-node.sysctl_tune ok congestion=bbr qdisc=fq</pre></section>
+      <h2>Node Fleet</h2>
+      <div class="table-wrap"><table><thead><tr><th>Node</th><th>Region</th><th>Status</th><th>sing-box</th><th>Connections</th><th>CPU</th><th>Memory</th><th>Kernel</th><th>Ports</th></tr></thead><tbody id="nodeBody"></tbody></table></div>
+      <section class="panel"><h2>Kernel Tuning</h2><div class="table-wrap"><table><thead><tr><th>Node</th><th>Region</th><th>BBR</th><th>qdisc</th><th>FD</th><th>Issues</th></tr></thead><tbody id="kernelBody"></tbody></table></div></section>
     </section>
 
     <section id="routes" class="band">
       <h1>Routes &amp; Rules</h1>
       <div class="split">
-        <section class="panel"><h2>Hit Funnel</h2><canvas data-chart="funnel"></canvas></section>
-        <section class="panel"><h2>Conflict Matrix</h2><canvas data-chart="matrix"></canvas></section>
+        <section class="panel"><h2>Outbound Mix</h2><canvas id="routeMixChart"></canvas></section>
+        <section class="panel"><h2>Rule Sources</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Source</th><th>Checksum</th></tr></thead><tbody id="ruleSourceBody"></tbody></table></div></section>
       </div>
-      <div class="tool-row">
-        <input id="domainInput" value="scholar.google.com" aria-label="Domain or IP">
-        <button id="testDomain" title="Test domain">Test</button>
-        <output id="domainResult">proxy-default via warp-exclude-google-scholar</output>
-      </div>
-      <table>
-        <thead><tr><th>Input</th><th>Outbound</th><th>Rule ID</th><th>Matched source</th><th>Decision</th></tr></thead>
-        <tbody>
-          <tr><td>scholar.google.com</td><td>proxy-default</td><td>warp-exclude-google-scholar:scholar.google.com</td><td>warp-exclude-google-scholar</td><td>proxy-default via Scholar exclusion</td></tr>
-          <tr><td>www.taobao.com</td><td>direct</td><td>builtin-geosite-cn:taobao.com</td><td>builtin-geosite-cn</td><td>direct before proxy rules</td></tr>
-        </tbody>
-      </table>
-      <section class="panel"><h2>Rule Version Diff</h2><pre>+ direct custom-direct.example.cn
-- warp example-warp-target.com
-~ hit change warp-only.example proxy-default -> warp-pool
-! blocked conflict: duplicate matcher with different outbound</pre></section>
-      <section class="panel"><h2>Coverage Analysis</h2><pre>samples=148 direct=67 proxy=72 warp=9
- hit-rate estimate: builtin-geosite-cn 28.4%
- hit-rate estimate: warp-include 6.1%</pre></section>
-      <section class="panel"><h2>Rule Sources</h2><table><thead><tr><th>Name</th><th>Source</th><th>Checksum</th><th>SSRF</th></tr></thead><tbody><tr><td>CN Direct</td><td>https public</td><td>sha256 verified</td><td>blocked private targets</td></tr></tbody></table></section>
+      <form id="routeProbeForm" class="tool-row" autocomplete="off">
+        <input id="domainInput" aria-label="Domain or IP" placeholder="domain or IP">
+        <select id="protocolInput" aria-label="Protocol"><option value="">any protocol</option><option value="vless">vless</option><option value="tuic">tuic</option><option value="hysteria2">hysteria2</option><option value="trojan">trojan</option></select>
+        <button type="submit" title="Test route">Test</button>
+        <output id="domainResult">No route test yet</output>
+      </form>
+      <h2>Route Decision Audit</h2>
+      <div class="table-wrap"><table><thead><tr><th>Input</th><th>Protocol</th><th>Node</th><th>Outbound</th><th>Rule ID</th><th>Matched source</th><th>Why</th></tr></thead><tbody id="routeTraceBody"></tbody></table></div>
+      <section class="panel"><h2>Active Rules</h2><div class="table-wrap"><table><thead><tr><th>Rule</th><th>Type</th><th>Outbound</th><th>Source</th></tr></thead><tbody id="ruleBody"></tbody></table></div></section>
     </section>
 
     <section id="subscriptions" class="band">
       <h1>Subscriptions</h1>
-      <div class="metric-grid">
-        <article><span>99p generation</span><strong>182 ms</strong><canvas data-chart="subgen"></canvas></article>
-        <article><span>RPS</span><strong>1,240</strong><canvas data-chart="subrps"></canvas></article>
-        <article><span>Errors</span><strong>0.04%</strong><canvas data-chart="suberr"></canvas></article>
-      </div>
-      <table><thead><tr><th>User</th><th>Device</th><th>Region</th><th>Protocol</th><th>Outbound policy</th><th>Client</th><th>Token</th><th>Audit</th><th>Status</th></tr></thead><tbody><tr><td>ops@example</td><td>phone-01</td><td>HK</td><td>tuic</td><td>warp-pool</td><td>sing-box</td><td>hashed</td><td>rate limited</td><td>active</td></tr></tbody></table>
+      <div id="subscriptionMetrics" class="metric-grid"></div>
+      <div class="table-wrap"><table><thead><tr><th>User</th><th>Device</th><th>Region</th><th>Protocol</th><th>Outbound policy</th><th>Client</th><th>Token kind</th><th>Status</th></tr></thead><tbody id="subscriptionBody"></tbody></table></div>
+      <section class="panel"><h2>Conversions</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Source client</th><th>Target client</th><th>Region</th><th>Protocol</th><th>Status</th></tr></thead><tbody id="conversionBody"></tbody></table></div></section>
     </section>
 
     <section id="warp" class="band">
       <h1>WARP Pool</h1>
-      <table>
-        <thead><tr><th>Profile</th><th>Health</th><th>Exit IP</th><th>ASN</th><th>IPv4</th><th>IPv6</th><th>DNS</th><th>WireGuard</th><th>Latency</th><th>Loss</th><th>HTTP</th></tr></thead>
-        <tbody>
-          <tr><td>warp-01</td><td>healthy</td><td>203.0.113.11</td><td>AS13335</td><td>yes</td><td>yes</td><td>ok</td><td>ok</td><td>38 ms</td><td>0.1%</td><td>99.99%</td></tr>
-          <tr><td>warp-02</td><td>cooldown</td><td>203.0.113.12</td><td>AS13335</td><td>yes</td><td>yes</td><td>servfail</td><td>retry</td><td>91 ms</td><td>4.8%</td><td>91%</td></tr>
-        </tbody>
-      </table>
+      <div class="table-wrap"><table><thead><tr><th>Profile</th><th>Health</th><th>Node</th><th>Exit IP</th><th>ASN</th><th>DNS</th><th>WireGuard</th><th>Latency</th><th>Loss</th><th>HTTP</th></tr></thead><tbody id="warpBody"></tbody></table></div>
       <div class="split">
-        <section class="panel"><h2>Site Scheduling</h2><canvas data-chart="site-scheduling"></canvas></section>
-        <section class="panel"><h2>Google Scholar Exclusion</h2><div class="status pass">100% not WARP</div></section>
+        <section class="panel"><h2>Site Scheduling</h2><canvas id="warpScheduleChart"></canvas></section>
+        <section class="panel"><h2>Scholar WARP Guard</h2><div id="scholarGuard" class="status">Not checked</div></section>
       </div>
     </section>
 
     <section id="protocols" class="band">
       <h1>Protocols</h1>
-      <div class="metric-grid">
-        <article><span>VLESS</span><strong>52%</strong><canvas data-chart="vless"></canvas></article>
-        <article><span>VMess</span><strong>8%</strong><canvas data-chart="vmess"></canvas></article>
-        <article><span>Hysteria2</span><strong>21%</strong><canvas data-chart="hy2"></canvas></article>
-        <article><span>TUIC</span><strong>11%</strong><canvas data-chart="tuic"></canvas></article>
-        <article><span>Trojan</span><strong>8%</strong><canvas data-chart="trojan"></canvas></article>
-      </div>
+      <div id="protocolGrid" class="metric-grid"></div>
     </section>
 
     <section id="traffic" class="band">
       <h1>Traffic</h1>
-      <canvas class="wide-chart" data-chart="traffic-wide"></canvas>
-      <h2>Recent Route Decisions</h2>
-      <table>
-        <thead><tr><th>Recent flow</th><th>Protocol</th><th>Node</th><th>Outbound</th><th>Why</th></tr></thead>
-        <tbody>
-          <tr><td>example-warp-target.com</td><td>vless</td><td>hk-01</td><td>warp-pool</td><td>user-warp-include matched before final proxy</td></tr>
-          <tr><td>gov.cn</td><td>tuic</td><td>sh-02</td><td>direct</td><td>builtin-geosite-cn matched direct-first policy</td></tr>
-        </tbody>
-      </table>
+      <canvas id="trafficWideChart" class="wide-chart"></canvas>
+      <h2>Recent Flow Decisions</h2>
+      <div class="table-wrap"><table><thead><tr><th>Input</th><th>Protocol</th><th>Node</th><th>Outbound</th><th>Why</th></tr></thead><tbody id="recentFlowBody"></tbody></table></div>
     </section>
 
     <section id="observability" class="band">
       <h1>Observability</h1>
       <div class="split">
-        <section class="panel"><h2>Metrics Query</h2><pre>node_rx_bps{node="hk-01"} 84200
-node_tx_bps{node="hk-01"} 42100</pre></section>
-        <section class="panel"><h2>Logs Query</h2><pre>level=warn route_conflict blocked=true</pre></section>
+        <section class="panel"><h2>Logs Query</h2><pre id="logOutput"></pre></section>
+        <section class="panel"><h2>Audit Logs</h2><div class="table-wrap"><table><thead><tr><th>Action</th><th>Resource</th><th>Actor</th><th>At</th></tr></thead><tbody id="auditBody"></tbody></table></div></section>
       </div>
     </section>
 
     <section id="security" class="band">
       <h1>Security</h1>
-      <div class="metric-grid">
-        <article><span>SAST</span><strong>Pass</strong><canvas data-chart="sast"></canvas></article>
-        <article><span>SCA</span><strong>Pass</strong><canvas data-chart="sca"></canvas></article>
-        <article><span>DAST</span><strong>Pending staging</strong><canvas data-chart="dast"></canvas></article>
-        <article><span>Container</span><strong>Pending image</strong><canvas data-chart="container"></canvas></article>
-        <article><span>IaC</span><strong>Pass</strong><canvas data-chart="iac"></canvas></article>
-        <article><span>Secrets</span><strong>Pass</strong><canvas data-chart="secrets"></canvas></article>
-        <article><span>SBOM</span><strong>Generated</strong><canvas data-chart="sbom"></canvas></article>
-        <article><span>License risk</span><strong>None</strong><canvas data-chart="license"></canvas></article>
-        <article><span>CVE severity</span><strong>0 high</strong><canvas data-chart="cve"></canvas></article>
-        <article><span>Waived gates</span><strong>0 active</strong><canvas data-chart="waivers"></canvas></article>
+      <div class="split">
+        <section class="panel"><h2>Security Waivers</h2><div class="table-wrap"><table><thead><tr><th>Gate</th><th>Severity</th><th>Owner</th><th>Expires</th><th>Remediation</th></tr></thead><tbody id="waiverBody"></tbody></table></div></section>
+        <section class="panel"><h2>API Availability</h2><div id="availabilityBody" class="stack"></div></section>
       </div>
-      <table><thead><tr><th>Gate</th><th>Status</th><th>Owner</th><th>Reason</th><th>Expires</th><th>Remediation</th></tr></thead><tbody><tr><td>DAST</td><td>Fail without staging evidence</td><td>security</td><td>staging target unavailable</td><td>2026-06-10</td><td>run ZAP against staging</td></tr><tr><td>Waiver</td><td>None</td><td>security</td><td>no active exception</td><td>n/a</td><td>keep gate blocking</td></tr></tbody></table>
     </section>
 
     <section id="deployments" class="band">
       <h1>Deployments</h1>
-      <table><thead><tr><th>Version</th><th>Canary</th><th>Argo Tunnel</th><th>Status</th><th>Rollback</th></tr></thead><tbody><tr><td>v42</td><td>20%</td><td>panel.example.com -> 127.0.0.1:8080</td><td>healthy</td><td><button title="Rollback">Rollback</button></td></tr></tbody></table>
+      <div class="table-wrap"><table><thead><tr><th>Node</th><th>Config version</th><th>Status</th><th>Last seen</th></tr></thead><tbody id="deploymentBody"></tbody></table></div>
+      <section class="panel"><h2>Argo Tunnels</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Hostname</th><th>Service</th><th>Status</th></tr></thead><tbody id="argoBody"></tbody></table></div></section>
     </section>
 
     <section id="incidents" class="band">
       <h1>Incidents</h1>
-      <table><thead><tr><th>Severity</th><th>Scope</th><th>Timeline</th><th>Runbook</th></tr></thead><tbody><tr><td>P0</td><td>secret leakage</td><td>detected, contained, rotating</td><td><button title="Pause release">Pause</button><button title="Revoke tokens">Revoke</button></td></tr><tr><td>P1</td><td>subscriptions</td><td>detected, confirmed, mitigated</td><td><button title="Enable cache">Cache</button><button title="Limit subscriptions">Limit</button></td></tr><tr><td>P2</td><td>WARP pool</td><td>probing, disabled, cooling down</td><td><button title="Switch exit">Switch</button><button title="Disable WARP profile">Disable</button></td></tr><tr><td>P3</td><td>dashboard metric</td><td>triaged, patched, verified</td><td><button title="Open runbook">Open</button></td></tr></tbody></table>
+      <div class="table-wrap"><table><thead><tr><th>Severity</th><th>Status</th><th>Title</th><th>Started</th></tr></thead><tbody id="incidentBody"></tbody></table></div>
+      <section class="panel"><h2>Runbooks</h2><div class="table-wrap"><table><thead><tr><th>Severity</th><th>Target</th><th>Runbooks</th><th>Primary mitigation</th></tr></thead><tbody id="runbookBody"></tbody></table></div></section>
     </section>
 
     <section id="settings" class="band">
       <h1>Settings</h1>
-      <table><thead><tr><th>Control</th><th>Value</th></tr></thead><tbody><tr><td>OIDC</td><td>enabled</td></tr><tr><td>Passkey</td><td>enabled</td></tr><tr><td>mTLS agent auth</td><td>required</td></tr><tr><td>CSP</td><td>strict</td></tr></tbody></table>
+      <div class="table-wrap"><table><thead><tr><th>Control</th><th>Value</th></tr></thead><tbody id="settingsBody"></tbody></table></div>
     </section>
   </main>
   <script src="./app.js"></script>

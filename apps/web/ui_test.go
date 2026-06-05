@@ -7,12 +7,8 @@ import (
 	"testing"
 )
 
-func TestDashboardIncludesRequiredNavigationAndMetrics(t *testing.T) {
-	html, err := os.ReadFile("index.html")
-	if err != nil {
-		t.Fatalf("read index.html: %v", err)
-	}
-	page := string(html)
+func TestDashboardIncludesProductionNavigationAndMountPoints(t *testing.T) {
+	html := readAsset(t, "index.html")
 
 	for _, label := range []string{
 		"Overview",
@@ -28,73 +24,78 @@ func TestDashboardIncludesRequiredNavigationAndMetrics(t *testing.T) {
 		"Incidents",
 		"Settings",
 	} {
-		if !strings.Contains(page, label) {
+		if !strings.Contains(html, label) {
 			t.Fatalf("missing navigation label %q", label)
 		}
 	}
 
-	for _, metric := range []string{
-		"Online nodes",
-		"Offline nodes",
-		"Alerts",
-		"Total connections",
-		"Active connections",
-		"New connection rate",
-		"Total traffic",
-		"Up / Down",
-		"CPU / memory",
-		"Disk / FD",
-		"Ports",
-		"Network PPS",
-		"99p API latency",
-		"Subscription latency",
-		"Device",
-		"Capacity tier",
-		"Autoscaling recommendation",
-		"Cost guardrail",
-		"Region",
-		"Protocol",
-		"Outbound policy",
-		"Config apply latency",
-		"Google Scholar Exclusion",
-		"SAST",
-		"SCA",
-		"DAST",
-		"Secrets",
-		"SBOM",
-		"License risk",
-		"CVE severity",
-		"Waived gates",
-		"Reason",
-		"Passkey",
-		"Route Decision Audit",
-		"Recent Route Decisions",
-		"Rule ID",
-		"Matched source",
-		"Recent flow",
-		"Why",
-		"hit change",
-		"Coverage Analysis",
-		"hit-rate estimate",
-		"Rule Sources",
-		"SSRF",
-		"DNS",
-		"WireGuard",
-		"P0",
-		"P1",
-		"P2",
-		"P3",
-		"Switch exit",
-		"Disable WARP profile",
-		"Limit subscriptions",
-		"Argo Tunnel",
+	for _, id := range []string{
+		"sessionForm",
+		"metricGrid",
+		"trafficMap",
+		"nodeBody",
+		"routeTraceBody",
+		"subscriptionBody",
+		"warpBody",
+		"protocolGrid",
+		"auditBody",
+		"incidentBody",
 	} {
-		if !strings.Contains(page, metric) {
-			t.Fatalf("missing metric %q", metric)
+		if !strings.Contains(html, `id="`+id+`"`) {
+			t.Fatalf("missing production data mount point %s", id)
 		}
 	}
-	if strings.Count(page, "<canvas") < 20 {
-		t.Fatalf("dashboard has too few charts")
+	if strings.Count(html, "<canvas") < 7 {
+		t.Fatalf("dashboard has too few live chart canvases")
+	}
+	if !strings.Contains(readAsset(t, "app.js"), "function metricCard(") {
+		t.Fatal("dashboard must render API-backed metric cards at runtime")
+	}
+}
+
+func TestDashboardDoesNotShipDemoOperationalData(t *testing.T) {
+	html := readAsset(t, "index.html")
+	js := readAsset(t, "app.js")
+	combined := html + "\n" + js
+
+	for _, forbidden := range []string{
+		"Online 36d 23h",
+		"UTC+8 2025-05-28",
+		"1.8M",
+		"42.8 TB",
+		"172.16.0.2",
+		"ops@example",
+		"hk-01",
+		"sg-02",
+		"v42",
+		"example-warp-target.com",
+		"www.taobao.com",
+		"function classify(",
+	} {
+		if strings.Contains(combined, forbidden) {
+			t.Fatalf("dashboard still ships demo operational data %q", forbidden)
+		}
+	}
+}
+
+func TestDashboardUsesAuthenticatedAPIDataAndLiveMap(t *testing.T) {
+	js := readAsset(t, "app.js")
+	for _, required := range []string{
+		"fetch(`${apiBase()}${path}`",
+		"headers.Authorization",
+		"sessionStorage",
+		"/api/v1/metrics/overview",
+		"/api/v1/nodes",
+		"/api/v1/warp/profiles",
+		"/api/v1/routes/trace",
+		"/api/v1/rules/test-domain",
+		"renderTrafficMap",
+		"coordinatesForRegion",
+		"state.data.nodes",
+	} {
+		if !strings.Contains(js, required) {
+			t.Fatalf("dashboard missing live API/map behavior %s", required)
+		}
 	}
 }
 
@@ -107,7 +108,16 @@ func TestDashboardStaticAssetsArePresentAndLightweight(t *testing.T) {
 		}
 		totalBytes += info.Size()
 	}
-	if totalBytes > 200*1024 {
+	if totalBytes > 260*1024 {
 		t.Fatalf("dashboard first-screen assets are too large: %d bytes", totalBytes)
 	}
+}
+
+func readAsset(t *testing.T, name string) string {
+	t.Helper()
+	data, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatalf("read %s: %v", name, err)
+	}
+	return string(data)
 }

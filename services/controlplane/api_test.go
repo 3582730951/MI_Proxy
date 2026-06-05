@@ -57,7 +57,8 @@ func TestHTTPDashboardServedAtRoot(t *testing.T) {
 
 	asset := httptest.NewRecorder()
 	server.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/app.js", nil))
-	if asset.Code != http.StatusOK || !strings.Contains(asset.Body.String(), "drawChart") {
+	assetBody := asset.Body.String()
+	if asset.Code != http.StatusOK || !strings.Contains(assetBody, "apiFetch") || !strings.Contains(assetBody, "renderTrafficMap") {
 		t.Fatalf("dashboard app asset unavailable: status=%d body=%s", asset.Code, asset.Body.String())
 	}
 
