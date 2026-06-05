@@ -2,9 +2,9 @@
 
 这是一个面向 sing-box 运维面板、规则编译、WARP 池、订阅生成和节点 Agent 的部署仓库。根目录提供了无交互 VPS 安装脚本，用户复制一条命令到 Linux VPS 上执行即可完成安装。
 
-## 一条命令安装
+## 公网 HTTP 一条命令安装
 
-在新的 VPS 上使用 `root` 用户执行下面这一整行：
+如果要安装后直接通过 `http://<VPS_PUBLIC_IP>:8080` 访问，在新的 VPS 上使用 `root` 用户执行下面这一整行。已经安装过旧版本时，也执行同一条命令，它会自动升级到新版本：
 
 ```sh
 tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp"
@@ -17,27 +17,54 @@ tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/sc
 - 拉取 `https://github.com/3582730951/MI_Proxy.git` 的 `main` 分支；
 - 调用 `scripts/install.sh` 完成无交互部署；
 - 默认安装到 `/opt/sing-box-next-panel`；
-- 默认监听 `127.0.0.1:8080`；
+- GitHub bootstrap 默认监听 `0.0.0.0:8080`，允许公网 IP HTTP 访问；
 - 默认把生成的密码写入 `/opt/sing-box-next-panel/passwd.txt`；
 - 默认创建 systemd 服务和自动更新 timer。
+- 如果检测到旧安装的 `/etc/sing-box-next-panel/install.env`，会复用旧安装目录、仓库分支和密码文件路径；
+- 如果旧安装目录已经是 git checkout，会执行快进更新、保留 `.env`、`passwd.txt` 和 Docker volume、重启服务并检查 `/healthz`；
+- 如果新版本启动失败，会回滚到升级前的 commit。
+
+如果 VPS 开启了系统防火墙或云厂商安全组，还需要放行 TCP 8080 端口。Ubuntu 常见命令：
+
+```sh
+ufw allow 8080/tcp
+```
+
+安装完成后访问：
+
+```text
+http://<VPS_PUBLIC_IP>:8080
+```
 
 项目不使用管道直接执行远程 shell 的安装方式。bootstrap 命令会先把脚本下载到本地临时文件，再执行本地文件。
 
 ## 常用复制命令
 
-默认安全安装，只允许本机访问管理端口：
+公网 HTTP 直连安装：
 
 ```sh
 tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp"
 ```
 
-公开绑定管理端口：
+GitHub bootstrap 默认会把 HTTP 服务绑定到 `0.0.0.0`。管理 API 仍然要求认证；生产环境建议再放到 VPN、Zero Trust、mTLS/TLS 网关或防火墙白名单后面。
+
+本机绑定安全安装，只允许 VPS 本机、SSH 隧道、反向代理或 VPN 访问管理端口：
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" -k PORT=8080
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" -l
 ```
 
-`-k` 会把 HTTP 服务绑定到 `0.0.0.0`。只建议在 VPN、Zero Trust、mTLS/TLS 网关或防火墙白名单后使用。管理 API 仍然要求认证，但默认本机绑定更安全。
+本机绑定时，可以用 SSH 隧道从自己的电脑访问：
+
+```sh
+ssh -L 8080:127.0.0.1:8080 root@<VPS_PUBLIC_IP>
+```
+
+然后在本地浏览器打开：
+
+```text
+http://127.0.0.1:8080
+```
 
 指定密码文件落盘位置：
 
@@ -58,7 +85,7 @@ cat > install.conf <<'EOF'
 REPO_URL=https://github.com/3582730951/MI_Proxy.git
 BRANCH=main
 INSTALL_DIR=/opt/sing-box-next-panel
-HOST=127.0.0.1
+HOST=0.0.0.0
 PORT=8080
 POSTGRES_BIND=127.0.0.1
 REDIS_BIND=127.0.0.1
@@ -86,7 +113,7 @@ POSTGRES_PASSWORD=<generated-secret>
 
 ## 自动更新
 
-默认安装会创建 `sing-box-next-panel-update.timer`，通过 `scripts/update.sh` 周期性更新：
+默认安装会创建 `sing-box-next-panel-update.timer`，通过 `scripts/update.sh` 周期性更新。你也可以随时重复执行 README 顶部那条 GitHub 一键命令来手动升级旧版本。
 
 - 使用 `git pull --ff-only`，只接受快进更新；
 - 保留 `.env`、`passwd.txt` 和 Docker volume；
@@ -110,6 +137,30 @@ POSTGRES_PASSWORD=<generated-secret>
 
 ```sh
 /opt/sing-box-next-panel/scripts/update.sh --install-dir /opt/sing-box-next-panel --restart-only
+```
+
+旧版本手动升级到最新版本，直接重新执行同一条 GitHub 命令：
+
+```sh
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp"
+```
+
+如果旧版本安装在自定义目录，且本机已有 `/etc/sing-box-next-panel/install.env`，脚本会自动识别；否则显式传安装目录：
+
+```sh
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" --install-dir /opt/mi-proxy
+```
+
+已安装后切换为公网 HTTP 访问：
+
+```sh
+/opt/sing-box-next-panel/scripts/install.sh -k PORT=8080
+```
+
+已安装后切回本机绑定：
+
+```sh
+/opt/sing-box-next-panel/scripts/install.sh -l PORT=8080
 ```
 
 ## 本地仓库内安装
@@ -142,6 +193,12 @@ systemctl status sing-box-next-panel-update.timer --no-pager
 
 ```sh
 curl -fsS http://127.0.0.1:8080/healthz
+```
+
+公网绑定后，也可以从外部访问：
+
+```text
+http://<VPS_PUBLIC_IP>:8080/healthz
 ```
 
 查看密码文件：

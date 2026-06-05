@@ -11,6 +11,8 @@ POSTGRES_BIND="${POSTGRES_BIND:-127.0.0.1}"
 REDIS_BIND="${REDIS_BIND:-127.0.0.1}"
 AUTO_UPDATE="${AUTO_UPDATE:-1}"
 PASSWD_FILE="${PASSWD_FILE:-}"
+HOST_CONFIGURED=0
+PORT_CONFIGURED=0
 PASSWD_FILE_CONFIGURED=0
 [ -z "$PASSWD_FILE" ] || PASSWD_FILE_CONFIGURED=1
 SKIP_DEPS=0
@@ -18,6 +20,7 @@ NO_SYSTEMD=0
 DRY_RUN=0
 COMMAND="install"
 CONFIG_FILE=""
+PREVIOUS_REVISION=""
 
 log() {
   printf '%s\n' "$*"
@@ -67,8 +70,8 @@ apply_kv() {
     REPO_URL|MI_PANEL_REPO_URL) REPO_URL=$value ;;
     BRANCH|MI_PANEL_BRANCH) BRANCH=$value ;;
     INSTALL_DIR|MI_PANEL_INSTALL_DIR) INSTALL_DIR=$value ;;
-    HOST) HOST=$value ;;
-    PORT) PORT=$value ;;
+    HOST) HOST=$value; HOST_CONFIGURED=1 ;;
+    PORT) PORT=$value; PORT_CONFIGURED=1 ;;
     POSTGRES_BIND) POSTGRES_BIND=$value ;;
     REDIS_BIND) REDIS_BIND=$value ;;
     AUTO_UPDATE) AUTO_UPDATE=$value ;;
@@ -92,14 +95,14 @@ load_config_file() {
 while [ $# -gt 0 ]; do
   case "$1" in
     install|update) COMMAND=$1; shift ;;
-    -l|--local) HOST="127.0.0.1"; shift ;;
-    -k|--public) HOST="0.0.0.0"; shift ;;
+    -l|--local) HOST="127.0.0.1"; HOST_CONFIGURED=1; shift ;;
+    -k|--public) HOST="0.0.0.0"; HOST_CONFIGURED=1; shift ;;
     -f|--file) [ $# -ge 2 ] || die "--file requires a path"; CONFIG_FILE=$2; shift 2 ;;
     --repo-url) [ $# -ge 2 ] || die "--repo-url requires a value"; REPO_URL=$2; shift 2 ;;
     --branch) [ $# -ge 2 ] || die "--branch requires a value"; BRANCH=$2; shift 2 ;;
     --install-dir) [ $# -ge 2 ] || die "--install-dir requires a value"; INSTALL_DIR=$2; shift 2 ;;
-    --host) [ $# -ge 2 ] || die "--host requires a value"; HOST=$2; shift 2 ;;
-    --port) [ $# -ge 2 ] || die "--port requires a value"; PORT=$2; shift 2 ;;
+    --host) [ $# -ge 2 ] || die "--host requires a value"; HOST=$2; HOST_CONFIGURED=1; shift 2 ;;
+    --port) [ $# -ge 2 ] || die "--port requires a value"; PORT=$2; PORT_CONFIGURED=1; shift 2 ;;
     --passwd-file) [ $# -ge 2 ] || die "--passwd-file requires a value"; PASSWD_FILE=$2; PASSWD_FILE_CONFIGURED=1; shift 2 ;;
     --skip-deps) SKIP_DEPS=1; shift ;;
     --no-systemd) NO_SYSTEMD=1; shift ;;
@@ -187,6 +190,7 @@ clone_or_update_repo() {
   parent=$(dirname "$INSTALL_DIR")
   run mkdir -p "$parent"
   if [ -d "$INSTALL_DIR/.git" ]; then
+    PREVIOUS_REVISION=$(current_revision)
     run git -C "$INSTALL_DIR" fetch --prune origin "$BRANCH"
     run git -C "$INSTALL_DIR" checkout "$BRANCH"
     run git -C "$INSTALL_DIR" pull --ff-only origin "$BRANCH"
@@ -196,6 +200,10 @@ clone_or_update_repo() {
     die "$INSTALL_DIR exists and is not an empty git checkout"
   fi
   run git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$INSTALL_DIR"
+}
+
+current_revision() {
+  git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null || true
 }
 
 generate_secret() {
@@ -272,8 +280,16 @@ write_env_file() {
     return
   fi
   mkdir -p "$INSTALL_DIR"
-  current_host=$(read_env_value HOST "$HOST")
-  current_port=$(read_env_value PORT "$PORT")
+  if [ "$HOST_CONFIGURED" = "1" ]; then
+    current_host=$HOST
+  else
+    current_host=$(read_env_value HOST "$HOST")
+  fi
+  if [ "$PORT_CONFIGURED" = "1" ]; then
+    current_port=$PORT
+  else
+    current_port=$(read_env_value PORT "$PORT")
+  fi
   current_pg_bind=$(read_env_value POSTGRES_BIND "$POSTGRES_BIND")
   current_redis_bind=$(read_env_value REDIS_BIND "$REDIS_BIND")
   if [ "$PASSWD_FILE_CONFIGURED" = "1" ]; then
@@ -327,7 +343,7 @@ start_stack() {
 }
 
 health_check() {
-  [ "$DRY_RUN" = "0" ] || return
+  [ "$DRY_RUN" = "0" ] || return 0
   url="http://127.0.0.1:${PORT}/healthz"
   i=0
   while [ "$i" -lt 60 ]; do
@@ -340,7 +356,15 @@ health_check() {
     sleep 2
     i=$((i + 1))
   done
-  die "service did not become healthy at $url"
+  return 1
+}
+
+rollback_to_previous_revision() {
+  [ -n "$PREVIOUS_REVISION" ] || return 1
+  log "install/update health check failed; rolling back to $PREVIOUS_REVISION"
+  run git -C "$INSTALL_DIR" checkout "$PREVIOUS_REVISION"
+  start_stack
+  health_check
 }
 
 write_metadata() {
@@ -441,8 +465,14 @@ case "$COMMAND" in
     write_metadata
     start_stack
     write_systemd_units
-    health_check
-    log "$PROJECT_NAME is running at http://$HOST:$PORT"
+    if health_check; then
+      log "$PROJECT_NAME is running at http://$HOST:$PORT"
+      exit 0
+    fi
+    if rollback_to_previous_revision; then
+      die "new version failed health check and was rolled back to $PREVIOUS_REVISION"
+    fi
+    die "service did not become healthy at http://127.0.0.1:${PORT}/healthz"
     ;;
   update)
     run_update
