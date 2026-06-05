@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
+	panelweb "sing-box-next-panel/apps/web"
 	"sing-box-next-panel/packages/rulecompiler"
 )
 
@@ -940,12 +941,13 @@ func NewHTTPHandler(cp *ControlPlane) http.Handler {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write(body)
 	})
+	mux.Handle("/", panelweb.Handler())
 	return securityMiddleware(cp, mux)
 }
 
 func securityMiddleware(cp *ControlPlane, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'")
+		w.Header().Set("Content-Security-Policy", contentSecurityPolicy(r.URL.Path))
 		w.Header().Set("Cross-Origin-Resource-Policy", "same-origin")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
@@ -972,6 +974,22 @@ func securityMiddleware(cp *ControlPlane, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func contentSecurityPolicy(path string) string {
+	if isWebAssetPath(path) {
+		return "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'"
+	}
+	return "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+}
+
+func isWebAssetPath(path string) bool {
+	switch path {
+	case "/", "/index.html", "/styles.css", "/app.js", "/favicon.ico":
+		return true
+	default:
+		return false
+	}
 }
 
 func TLS13Config() *tls.Config {

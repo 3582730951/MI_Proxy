@@ -35,6 +35,39 @@ func TestHTTPAdminAPIsRequireAuthentication(t *testing.T) {
 	}
 }
 
+func TestHTTPDashboardServedAtRoot(t *testing.T) {
+	cp := New(nil)
+	server := NewHTTPHandler(cp)
+
+	root := httptest.NewRecorder()
+	server.ServeHTTP(root, httptest.NewRequest(http.MethodGet, "/", nil))
+	if root.Code != http.StatusOK {
+		t.Fatalf("dashboard root status=%d body=%s", root.Code, root.Body.String())
+	}
+	if contentType := root.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
+		t.Fatalf("dashboard root content-type=%q, want text/html", contentType)
+	}
+	if body := root.Body.String(); !strings.Contains(body, "Sing-Box Pro") || !strings.Contains(body, "Overview") {
+		t.Fatalf("dashboard root missing expected markup: %s", body)
+	}
+	csp := root.Header().Get("Content-Security-Policy")
+	if !strings.Contains(csp, "script-src 'self'") || !strings.Contains(csp, "style-src 'self'") {
+		t.Fatalf("dashboard CSP does not allow bundled static assets: %q", csp)
+	}
+
+	asset := httptest.NewRecorder()
+	server.ServeHTTP(asset, httptest.NewRequest(http.MethodGet, "/app.js", nil))
+	if asset.Code != http.StatusOK || !strings.Contains(asset.Body.String(), "drawChart") {
+		t.Fatalf("dashboard app asset unavailable: status=%d body=%s", asset.Code, asset.Body.String())
+	}
+
+	health := httptest.NewRecorder()
+	server.ServeHTTP(health, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if csp := health.Header().Get("Content-Security-Policy"); strings.Contains(csp, "script-src") || strings.Contains(csp, "style-src") {
+		t.Fatalf("health endpoint CSP should remain strict: %q", csp)
+	}
+}
+
 func TestHTTPSubscriptionEndpointDoesNotExposeOtherTokens(t *testing.T) {
 	now := time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC)
 	cp := New(func() time.Time { return now })

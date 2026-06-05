@@ -36,6 +36,8 @@ ufw allow 8080/tcp
 http://<VPS_PUBLIC_IP>:8080
 ```
 
+控制面会直接在根路径提供 `apps/web` 运维面板；健康检查继续使用 `/healthz`。
+
 项目不使用管道直接执行远程 shell 的安装方式。bootstrap 命令会先把脚本下载到本地临时文件，再执行本地文件。
 
 ## 常用复制命令
