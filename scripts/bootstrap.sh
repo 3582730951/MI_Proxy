@@ -164,6 +164,7 @@ bootstrap_checkout() {
 
 scan_args_for_bootstrap "$@"
 load_existing_metadata_for_bootstrap
+log "starting $PROJECT_NAME bootstrap; install dir is $INSTALL_DIR"
 install_git_if_missing
 log "bootstrapping $PROJECT_NAME from $REPO_URL branch $BRANCH"
 bootstrap_checkout "$@"

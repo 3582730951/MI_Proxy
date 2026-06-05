@@ -7,7 +7,7 @@
 如果要安装后直接通过 `http://<VPS_PUBLIC_IP>:8080` 访问，在新的 VPS 上使用 `root` 用户执行下面这一整行。已经安装过旧版本时，也执行同一条命令，它会自动升级到新版本：
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp"
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp"
 ```
 
 这条命令会：
@@ -43,7 +43,7 @@ http://<VPS_PUBLIC_IP>:8080
 公网 HTTP 直连安装：
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp"
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp"
 ```
 
 GitHub bootstrap 默认会把 HTTP 服务绑定到 `0.0.0.0`。管理 API 仍然要求认证；生产环境建议再放到 VPN、Zero Trust、mTLS/TLS 网关或防火墙白名单后面。
@@ -51,7 +51,7 @@ GitHub bootstrap 默认会把 HTTP 服务绑定到 `0.0.0.0`。管理 API 仍然
 本机绑定安全安装，只允许 VPS 本机、SSH 隧道、反向代理或 VPN 访问管理端口：
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" -l
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp" -l
 ```
 
 本机绑定时，可以用 SSH 隧道从自己的电脑访问：
@@ -69,13 +69,13 @@ http://127.0.0.1:8080
 指定密码文件落盘位置：
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" --passwd-file /etc/sing-box-next-panel/passwd.txt
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp" --passwd-file /etc/sing-box-next-panel/passwd.txt
 ```
 
 指定安装目录、端口、仓库和分支：
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" --install-dir /opt/mi-proxy --repo-url https://github.com/3582730951/MI_Proxy.git --branch main PORT=8088
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp" --install-dir /opt/mi-proxy --repo-url https://github.com/3582730951/MI_Proxy.git --branch main PORT=8088
 ```
 
 从配置文件安装：
@@ -92,7 +92,7 @@ REDIS_BIND=127.0.0.1
 AUTO_UPDATE=1
 PASSWD_FILE=/opt/sing-box-next-panel/passwd.txt
 EOF
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" -f install.conf
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp" -f install.conf
 ```
 
 ## 密码文件
@@ -142,13 +142,13 @@ POSTGRES_PASSWORD=<generated-secret>
 旧版本手动升级到最新版本，直接重新执行同一条 GitHub 命令：
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp"
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp"
 ```
 
 如果旧版本安装在自定义目录，且本机已有 `/etc/sing-box-next-panel/install.env`，脚本会自动识别；否则显式传安装目录：
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" --install-dir /opt/mi-proxy
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp" --install-dir /opt/mi-proxy
 ```
 
 已安装后切换为公网 HTTP 访问：

@@ -84,6 +84,10 @@ func TestDeploymentAndDatabaseArtifactsExist(t *testing.T) {
 	for _, required := range []string{
 		"MI Proxy VPS",
 		"tmp=$(mktemp)",
+		"Downloading bootstrap script",
+		"curl -fL --retry 3",
+		"wget -O \"$tmp\"",
+		"test -s \"$tmp\"",
 		"scripts/bootstrap.sh",
 		"GitHub bootstrap 默认监听",
 		"旧版本",
@@ -109,6 +113,7 @@ func TestDeploymentAndDatabaseArtifactsExist(t *testing.T) {
 	updateScript := read(t, filepath.Join(root, "scripts/update.sh"))
 	for _, required := range []string{
 		"one-command VPS installs",
+		"starting $PROJECT_NAME bootstrap",
 		"defaults to public HTTP",
 		"BIND_CONFIGURED",
 		"load_existing_metadata_for_bootstrap",
@@ -129,6 +134,9 @@ func TestDeploymentAndDatabaseArtifactsExist(t *testing.T) {
 		if !strings.Contains(bootstrapScript, required) {
 			t.Fatalf("bootstrap script missing one-command deployment feature %s", required)
 		}
+	}
+	if strings.Contains(readme, "wget -qO") || strings.Contains(readme, "curl -fsSLo") {
+		t.Fatal("README bootstrap command must print download failures instead of using quiet fetch flags")
 	}
 	for _, required := range []string{
 		"--dry-run",

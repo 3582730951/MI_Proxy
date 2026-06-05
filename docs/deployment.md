@@ -5,14 +5,14 @@
 Run this one-command bootstrapper from a root shell on a fresh VPS when direct public HTTP access is required. Re-run the same command on an older install to upgrade it with the latest installer:
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp"
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp"
 ```
 
 The GitHub bootstrap path defaults the admin HTTP port to `0.0.0.0`, so the panel is reachable at `http://<VPS_PUBLIC_IP>:8080` after the host firewall and cloud security group allow TCP 8080. The bootstrapper installs only the minimum clone dependency when needed, checks out the repository into a temporary directory, and delegates to `scripts/install.sh` with the same arguments. For example:
 
 ```sh
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" -l
-tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" --passwd-file /etc/sing-box-next-panel/passwd.txt
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp" -l
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp" --passwd-file /etc/sing-box-next-panel/passwd.txt
 ```
 
 For older installs, the bootstrapper reads `/etc/sing-box-next-panel/install.env` when present, preserves the recorded install directory and password file, fast-forwards the existing git checkout, restarts the stack, checks `/healthz`, and rolls back to the previous commit if the upgraded stack does not become healthy.
