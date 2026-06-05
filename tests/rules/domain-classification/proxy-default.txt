@@ -1,0 +1,5 @@
+# domain,expected_outbound,reason
+example.com,proxy-default,default
+github.com,proxy-default,developer
+openai.com,proxy-default,ai
+

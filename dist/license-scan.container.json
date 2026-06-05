@@ -1,0 +1,66 @@
+{
+  "generatedAt": "2026-06-05T08:06:01.059527461Z",
+  "policy": {
+    "allowedLicenses": [
+      "APACHE-2.0",
+      "BSD-2-CLAUSE",
+      "BSD-3-CLAUSE",
+      "FIRST-PARTY",
+      "ISC",
+      "MIT",
+      "MPL-2.0"
+    ],
+    "forbiddenLicenses": [
+      "AGPL-3.0",
+      "AGPL-3.0-ONLY",
+      "AGPL-3.0-OR-LATER",
+      "BUSL-1.1",
+      "COMMONS-CLAUSE",
+      "GPL-3.0",
+      "GPL-3.0-ONLY",
+      "GPL-3.0-OR-LATER",
+      "SSPL-1.0"
+    ],
+    "unknownDependencyAction": "block"
+  },
+  "passed": true,
+  "components": [
+    {
+      "name": "services/controlplane",
+      "kind": "application",
+      "license": "FIRST-PARTY",
+      "status": "allowed",
+      "reason": "first-party project component"
+    },
+    {
+      "name": "agent",
+      "kind": "application",
+      "license": "FIRST-PARTY",
+      "status": "allowed",
+      "reason": "first-party project component"
+    },
+    {
+      "name": "packages/rulecompiler",
+      "kind": "library",
+      "license": "FIRST-PARTY",
+      "status": "allowed",
+      "reason": "first-party project component"
+    },
+    {
+      "name": "apps/web",
+      "kind": "web-assets",
+      "license": "FIRST-PARTY",
+      "status": "allowed",
+      "reason": "first-party project component"
+    },
+    {
+      "name": "github.com/andybalholm/brotli",
+      "version": "v1.1.1",
+      "kind": "go-module",
+      "license": "MIT",
+      "status": "allowed",
+      "reason": "known reviewed dependency license"
+    }
+  ],
+  "findings": []
+}

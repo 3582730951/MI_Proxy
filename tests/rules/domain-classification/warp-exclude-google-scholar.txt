@@ -1,0 +1,7 @@
+# domain,expected_outbound,reason
+scholar.google.com,proxy-default,warp-exclude
+scholar.googleusercontent.com,proxy-default,warp-exclude
+citations.google.com,proxy-default,warp-exclude
+academic.google.com,proxy-default,warp-exclude
+google.com/scholar,proxy-default,warp-exclude
+

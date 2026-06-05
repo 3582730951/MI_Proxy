@@ -1,0 +1,15 @@
+[checks]
+negative_data_rejection = true
+not_a_server_error = true
+status_code_conformance = true
+content_type_conformance = true
+response_schema_conformance = true
+
+[phases]
+examples = true
+coverage = true
+fuzzing = true
+
+[phases.fuzzing]
+max-examples = 1000
+

@@ -1,0 +1,5 @@
+# domain,expected_outbound,reason
+example-warp-target.com,warp-pool,user-warp-include
+api.example-warp-target.com,warp-pool,user-warp-include
+warp-only.example,warp-pool,user-warp-include
+

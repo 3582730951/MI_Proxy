@@ -1,0 +1,103 @@
+{
+  "complete": false,
+  "generatedAt": "2026-06-05T08:06:07.765345694Z",
+  "items": [
+    {
+      "category": "environment",
+      "name": "cmd -\u003e WSL -\u003e Ubuntu -\u003e Docker ubuntu:22.04 zero-dependency validation",
+      "status": "container-smoke-passed",
+      "evidence": "./scripts/wsl-docker-ci.ps1"
+    },
+    {
+      "category": "rules",
+      "name": "CN direct, private IP direct, WARP include, Google Scholar exclude, subscription conversion/rule source/webhook SSRF validation, source checksum validation, bounded large-rule coverage/hit-rate estimates, canary rollout, conflict blocking, and diff hit-change reports",
+      "status": "container-test-passed",
+      "evidence": "go test ./packages/rulecompiler ./services/controlplane"
+    },
+    {
+      "category": "control-plane",
+      "name": "nodes, RBAC, ABAC by region/tag/environment, kernel tuning status, protocol inbound stats, route decision trace audit, subscription context/rules/split-DNS/cache/compression, node-scoped config deployment payloads, capacity tier and autoscaling recommendations, WARP WireGuard config import/health/cooldown/recovery and scheduling modes, Argo tunnel config rendering plus Cloudflare API automation plan, config rollback, BBR+ target IP cache, Agent credential rotation",
+      "status": "container-test-passed",
+      "evidence": "go test ./services/controlplane"
+    },
+    {
+      "category": "security",
+      "name": "API token scopes/IP allowlist, node ABAC, Agent mTLS fingerprint auth, sensitive-operation confirmation, encrypted WARP keys, subscription access audit, security waiver owner/expiry/remediation enforcement, audit hash chain",
+      "status": "container-test-passed",
+      "evidence": "services/controlplane/controlplane_test.go; services/controlplane/api_test.go"
+    },
+    {
+      "category": "security",
+      "name": "OIDC config validation, JWT alg/kid hardening, secure rotating session cookies, Passkey/WebAuthn challenge verification, TOTP verification, strict CSP/security headers, CORS whitelist, CSRF protection, TLS 1.3 gateway config, login/config/agent registration rate limits",
+      "status": "container-test-passed",
+      "evidence": "services/controlplane/auth_test.go; services/controlplane/api_test.go; cmd/dast-smoke"
+    },
+    {
+      "category": "api",
+      "name": "draft API endpoints for nodes, rules including POST domain test, webhook endpoints, subscriptions and conversion jobs, WARP profile import/probe/disable, protocol stats, in-memory node metrics write/query, logs, audit, alerts, security waivers, incidents, and P0/P1/P2/P3 runbook catalog",
+      "status": "container-test-passed",
+      "evidence": "services/controlplane/api_test.go"
+    },
+    {
+      "category": "agent",
+      "name": "low resource mode, BBR probe, structured sysctl/rlimit tuning plan, UDP protection, systemd watchdog, config rollback, local ring-buffer logs",
+      "status": "container-test-passed",
+      "evidence": "go test ./agent"
+    },
+    {
+      "category": "ui",
+      "name": "dark operations dashboard aligned to example image, required navigation/metrics, capacity/autoscaling/cost signals, and route decision audit drill-down",
+      "status": "container-test-passed",
+      "evidence": "go test ./apps/web"
+    },
+    {
+      "category": "deploy",
+      "name": "Dockerfile, docker-compose without default DB password, localhost-bound service ports, zero-interaction VPS install script with runtime passwd.txt password file, safe auto-update script with configurable password file, health check, and rollback, PostgreSQL schema and indexes",
+      "status": "container-test-passed",
+      "evidence": "go test ./tests; Dockerfile; docker-compose.yml; migrations/001_core.sql; scripts/install.sh; scripts/update.sh"
+    },
+    {
+      "category": "performance",
+      "name": "1000 node heartbeat, 2000 subscription render smoke, and 100k rule publish under 10s local regression",
+      "status": "container-smoke-passed",
+      "evidence": "dist/load-smoke.container.json; services/controlplane/controlplane_test.go"
+    },
+    {
+      "category": "security",
+      "name": "local DAST smoke and API fuzz smoke",
+      "status": "container-smoke-passed",
+      "evidence": "dist/dast-smoke.container.json; dist/api-fuzz.container.json"
+    },
+    {
+      "category": "security-tools",
+      "name": "CodeQL, Semgrep, Gitleaks, TruffleHog, Trivy, Grype, OSV/Syft, Checkov, tfsec, KICS, ZAP, Schemathesis, RESTler, FOSSA/ScanCode, k6, toxiproxy configs, local dependency license policy scan, and local IaC policy scan",
+      "status": "config-present-container-tested",
+      "evidence": ".github/workflows; .semgrep.yml; .gitleaks.toml; zap.yaml; schemathesis.toml; tests/load; tests/chaos; cmd/license-scan; cmd/iac-scan"
+    },
+    {
+      "category": "stability",
+      "name": "node offline, Postgres/Redis dependency degradation, 100k rule publish without blocking subscriptions/API, WARP 50% failure, P0/P1/P2/P3 runbook catalog and rollback/pause/exit-switch/subscription-limit actions, agent rollback, memory pressure smoke",
+      "status": "container-smoke-passed",
+      "evidence": "dist/chaos-smoke.container.json; services/controlplane/controlplane_test.go"
+    },
+    {
+      "category": "security",
+      "name": "local secret scan, allowlisted structured command execution enforcement, and incompatible dependency license blocking",
+      "status": "container-tool-passed",
+      "evidence": "go run ./cmd/security-scan; go run ./cmd/license-scan; internal/safeexec"
+    },
+    {
+      "category": "release",
+      "name": "SBOM, license/IaC scan evidence, local provenance, release gate, cosign/SLSA/canary workflow",
+      "status": "config-present-container-tested",
+      "evidence": "dist/sbom.container.json; dist/license-scan.container.json; dist/iac-scan.container.json; dist/provenance.container.json; scripts/release-gate.ps1; .github/workflows/release.yml"
+    },
+    {
+      "category": "external",
+      "name": "protected main, full security tools including FOSSA/ScanCode, staging DAST, full load, toxiproxy chaos, human/GPT-5.5 review, cosign, 24h canary",
+      "status": "requires-external-or-long-duration-evidence",
+      "evidence": "GitHub/staging/release/canary records"
+    }
+  ],
+  "note": "This report lists local and WSL Docker Ubuntu 22.04 evidence. Long-running production gates such as 30-minute 2,000 RPS load, full ZAP, toxiproxy DB/Redis chaos, human review, cosign release signing, and 24h canary still require external or long-duration evidence."
+}

@@ -1,0 +1,5 @@
+# domain,expected_outbound,reason
+cache.chinacache.com,direct,cn-cdn
+asset.tencent.com,direct,cn-cloud
+oss.ctyun.cn,direct,cn-cloud
+

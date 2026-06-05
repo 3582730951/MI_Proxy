@@ -1,0 +1,7 @@
+# domain,expected_outbound,reason
+10.0.0.1,direct,private-ip
+192.168.1.10,direct,private-ip
+172.16.20.30,direct,private-ip
+127.0.0.1,direct,localhost
+fc00::1,direct,ula
+

@@ -1,0 +1,5 @@
+# domain,expected_outbound,reason
+www.icbc.com.cn,direct,cn-bank
+pay.alipay.com,direct,cn-payment
+mobile.chinabank.com.cn,direct,cn-bank
+

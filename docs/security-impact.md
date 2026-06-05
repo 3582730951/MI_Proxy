@@ -1,0 +1,53 @@
+# Security impact analysis
+
+## Controls implemented locally
+- Admin HTTP APIs require `X-User-ID`, `X-Tenant-ID`, and `X-Role`; unauthenticated admin requests return 401.
+- RBAC blocks cross-tenant access and operator write actions.
+- Node ABAC limits node reads, registration, heartbeat, config deployment, agent credential rotation, and overview metrics by tenant, region, node tag, and environment.
+- API tokens are hashed at rest, scoped, expiring, and optionally IP allowlisted.
+- Agent mTLS client certificate fingerprints are hashed at rest, rotated through the control plane, and accepted only for node heartbeat updates.
+- OIDC/OAuth2 configuration validation requires HTTPS issuer and redirect URLs.
+- OIDC JWT header hardening rejects `alg=none`, non-allowlisted algorithms, malformed tokens, and unsafe `kid` values before key lookup.
+- Session-cookie helpers rotate the session value and set `Secure`, `HttpOnly`, `SameSite=Strict`, host-only scope, and `Path=/`.
+- Passkey/WebAuthn local verification binds challenges to RP ID, HTTPS origin, user ID, credential ID, and authenticator sign count to block replay.
+- TOTP verification supports time-windowed one-time codes for second factors.
+- Rate limits protect login attempts, subscription rendering, config deployment, and Agent registration surfaces.
+- Sensitive write operations require a deterministic second confirmation token in the local implementation.
+- Subscription tokens are generated randomly, stored as hashes, and can be revoked individually.
+- Successful subscription renders append token-free `subscription.access` audit records with the subscription resource ID and client IP, never the raw token or token hash.
+- Subscription conversion job registration blocks SSRF-prone source URLs, rejects URL userinfo/query/fragment secrets, requires a sha256 source checksum, requires confirmation, and records only a queued conversion job rather than fetching remote content inside the control plane.
+- WARP private keys are envelope-encrypted before in-memory persistence and redacted from API list responses.
+- Config deployment renders a node-scoped Agent payload from structured config documents, including only the global block and the target node block; deployment records persist only the payload hash and byte count, not the rendered payload or other nodes' config fragments.
+- WARP standard WireGuard config import parses only `[Interface]` and `[Peer]` fields, validates endpoint/CIDR/DNS values without executing helper scripts or shell commands, encrypts imported `PrivateKey`, and redacts it from API responses.
+- Argo tunnel integration stores only tunnel metadata, rejects URL userinfo, strips query and fragment data from service URLs, requires confirmation on create, renders cloudflared config without Cloudflare API tokens, and generates token-free Cloudflare API tunnel/configuration/DNS automation plans for external executors.
+- Security-sensitive actions append audit records with a hash chain for tamper detection.
+- Logs are sanitized for token, private key, WARP private key, API key, and password assignments.
+- Rule publish blocks conflicts before replacing the active policy, serializes concurrent publishes with a dedicated publish lock, and computes large-rule diff/coverage reports outside the control-plane state lock so existing subscriptions and read APIs keep making progress.
+- Route decision trace audit stores sanitized host/IP inputs and matched rule metadata, so UI transparency does not persist raw URLs or query tokens.
+- Rule set source registration blocks SSRF-prone source URLs, including localhost, private IP, link-local metadata targets, URL userinfo, query-string secrets, non-HTTPS schemes, and non-443 explicit ports.
+- Webhook endpoint registration applies the same public-HTTPS SSRF guardrail, requires confirmation, stores optional signing secrets only as hashes, and never returns raw signing secrets or secret hashes in API responses.
+- Node metric writes require authenticated `metrics:write` access, node metrics queries require `metrics:read`, both honor tenant and node ABAC filters, and high-volume metric samples are retained in an in-memory time-series buffer rather than PostgreSQL.
+- Capacity recommendations require `metrics:read`, reuse node ABAC-filtered overview metrics, and expose only aggregate tier/replica/action guidance rather than raw node secrets or rendered configs.
+- Kernel tuning status reads require `nodes:read`, report only normalized sysctl capability values, and honor tenant plus node ABAC filters. Agent-side automatic tuning is represented as structured `sysctl`/`rlimit` actions for `nofile`, `somaxconn`, `tcp_fastopen`, and `ip_local_port_range`, avoiding shell string construction.
+- Protocol inbound stats are accepted only through authenticated node heartbeat paths or metrics-read aggregation, normalized to supported protocol names, and filtered through node ABAC before API responses.
+- Alert reads require `alerts:read`, alert acknowledgement requires `alerts:write` plus confirmation, alert messages are secret-redacted and HTML-escaped before API responses, and acknowledgements are audit logged.
+- Security waiver creation requires `security:write`, second confirmation, a named owner, a future expiration, and a remediation plan; waiver text is redacted/HTML-escaped and creation is audit logged.
+- Google Scholar WARP routing is blocked in compiler tests and scheduler selection.
+- Local security scan blocks private key material, obvious cloud keys, weak password assignments, shell-string command execution, raw command execution outside `internal/safeexec`, and curl-pipe-bash patterns.
+- Local license scan blocks unknown external dependency licenses and known incompatible licenses; the only current third-party Go dependency is explicitly reviewed as MIT.
+- Provenance git commands use `internal/safeexec` with exact command and argument allowlists instead of shell strings or path-based command names.
+- Docker Compose requires a caller-supplied or install-script-generated database password and binds Postgres, Redis, and the control plane to localhost by default. The VPS installer is noninteractive, avoids pipe-to-shell execution, stores generated passwords in a mode-0600 `passwd.txt` under the runtime directory by default with a configurable `PASSWD_FILE`, keeps non-secret runtime settings in `.env`, and registers an auto-update timer only through a local script that fast-forwards git, checks `/healthz`, and rolls back on failed deployment health.
+- Local IaC scan enforces non-root Docker runtime, requires `@sha256` digest-pinned Dockerfile and Compose images, rejects `latest` images, and verifies secure Compose defaults before release evidence is accepted.
+- CORS is allowlisted and cross-origin state-changing browser requests require a CSRF token.
+- HTTP responses include strict CSP, frame-denial, no-referrer, same-origin resource, and no-sniff security headers; DAST smoke checks these headers.
+- Control plane TLS helper enforces TLS 1.3 minimum and advertises HTTP/2 for API gateway termination.
+- Dependency health changes are RBAC-protected metrics writes and dependency messages are sanitized before storage.
+- Repository includes CodeQL, Semgrep, Gitleaks, TruffleHog, Trivy, Grype, OSV, Checkov, tfsec, KICS, ZAP, Schemathesis, RESTler, FOSSA/ScanCode, k6, and toxiproxy configuration hooks/artifacts for external CI/staging execution.
+- Release workflow and `scripts/release-gate.ps1` require local license scan evidence in provenance plus cosign, SLSA provenance, protected main, human review, GPT-5.5 review, staging DAST, full load, toxiproxy chaos, and 24-hour canary evidence before release.
+
+## External evidence still required
+- CodeQL, Semgrep, Gitleaks, Trivy, Grype, Syft, ZAP, Schemathesis, RESTler, and FOSSA/ScanCode license scans in a real CI environment.
+- Container image scan after an image exists.
+- DAST against staging.
+- Manual penetration testing and security owner approval.
+- Actual cosign-signed release artifacts, SLSA provenance records, and 24-hour canary records.

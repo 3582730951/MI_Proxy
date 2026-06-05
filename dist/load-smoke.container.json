@@ -1,0 +1,13 @@
+{
+  "nodeCount": 1000,
+  "subscriptionRequests": 2000,
+  "heartbeatP99Ms": 0.003,
+  "subscriptionP99Ms": 5.519,
+  "subscriptionErrors": 0,
+  "subscriptionErrorRate": 0,
+  "heartbeatSLOPassed": true,
+  "subscriptionSLOPassed": true,
+  "classificationMillionCoveredByRuleTests": true,
+  "passed": true,
+  "mode": "smoke"
+}

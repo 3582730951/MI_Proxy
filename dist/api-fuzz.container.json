@@ -1,0 +1,8 @@
+{
+  "cases": 1000,
+  "server5xx": 0,
+  "authBypass": 0,
+  "crashInputs": null,
+  "passed": true,
+  "mode": "local-api-fuzz-smoke"
+}

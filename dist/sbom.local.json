@@ -1,0 +1,51 @@
+{
+  "name": "sing-box-next-panel",
+  "type": "cyclonedx-lite",
+  "generated": "2026-06-05T00:46:12.0708872Z",
+  "goVersion": "go1.25.5",
+  "components": [
+    {
+      "bomRef": "pkg:local/services-controlplane",
+      "name": "services/controlplane",
+      "type": "application",
+      "license": "FIRST-PARTY"
+    },
+    {
+      "bomRef": "pkg:local/agent",
+      "name": "agent",
+      "type": "application",
+      "license": "FIRST-PARTY"
+    },
+    {
+      "bomRef": "pkg:local/packages-rulecompiler",
+      "name": "packages/rulecompiler",
+      "type": "library",
+      "license": "FIRST-PARTY"
+    },
+    {
+      "bomRef": "pkg:local/apps-web",
+      "name": "apps/web",
+      "type": "web-assets",
+      "license": "FIRST-PARTY"
+    },
+    {
+      "bomRef": "pkg:golang/github.com/andybalholm/brotli@v1.1.1",
+      "name": "github.com/andybalholm/brotli",
+      "type": "go-module",
+      "version": "v1.1.1",
+      "license": "MIT"
+    }
+  ],
+  "dependencies": [
+    {
+      "ref": "pkg:local/sing-box-next-panel",
+      "dependsOn": [
+        "pkg:golang/github.com/andybalholm/brotli@v1.1.1",
+        "pkg:local/agent",
+        "pkg:local/apps-web",
+        "pkg:local/packages-rulecompiler",
+        "pkg:local/services-controlplane"
+      ]
+    }
+  ]
+}

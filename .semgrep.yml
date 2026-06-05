@@ -1,0 +1,23 @@
+rules:
+  - id: go-no-shell-string-execution
+    languages: [go]
+    severity: ERROR
+    message: Avoid shell string execution. Use structured args and allowlisted commands.
+    pattern-either:
+      - pattern: exec.Command("sh", "-c", ...)
+      - pattern: exec.Command("bash", "-c", ...)
+      - pattern: exec.Command("cmd", "/c", ...)
+      - pattern: exec.Command("powershell", "-Command", ...)
+
+  - id: no-curl-pipe-shell
+    languages: [generic]
+    severity: ERROR
+    message: Do not pipe remote scripts into a shell.
+    pattern-regex: '(?i)curl\s+[^|]+\|\s*(bash|sh)'
+
+  - id: no-secret-log-keywords
+    languages: [go]
+    severity: WARNING
+    message: Secret-bearing fields must be redacted before logging.
+    pattern-regex: '(fmt\.Print|log\.Print).*(token|private_key|warp_private_key|api_key|password)'
+

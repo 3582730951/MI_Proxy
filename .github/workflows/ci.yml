@@ -1,0 +1,137 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - run: go test ./...
+      - run: go run ./cmd/security-scan
+      - run: go run ./cmd/license-scan > license-scan.json
+      - run: go run ./cmd/iac-scan > iac-scan.json
+      - run: go run ./cmd/load-smoke > load-smoke.json
+      - run: go run ./cmd/dast-smoke > dast-smoke.json
+      - run: go run ./cmd/api-fuzz > api-fuzz.json
+      - run: go run ./cmd/chaos-smoke > chaos-smoke.json
+      - run: go run ./cmd/sbom > sbom.json
+      - run: go run ./cmd/acceptance > acceptance-local.json
+      - run: go run ./cmd/provenance sbom.json license-scan.json iac-scan.json acceptance-local.json > provenance.json
+      - run: test -f .semgrep.yml -a -f .gitleaks.toml -a -f zap.yaml -a -f schemathesis.toml -a -f api/openapi.yaml
+      - uses: actions/upload-artifact@v4
+        with:
+          name: local-evidence
+          path: |
+            sbom.json
+            license-scan.json
+            iac-scan.json
+            acceptance-local.json
+            provenance.json
+            load-smoke.json
+            dast-smoke.json
+            api-fuzz.json
+            chaos-smoke.json
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - run: mkdir -p dist
+      - run: go run ./cmd/security-scan
+      - run: go run ./cmd/license-scan
+      - run: go run ./cmd/iac-scan
+      - name: optional gitleaks
+        run: |
+          if command -v gitleaks >/dev/null 2>&1; then
+            gitleaks detect --source .
+          fi
+      - name: optional semgrep
+        run: |
+          if command -v semgrep >/dev/null 2>&1; then
+            semgrep ci
+          fi
+      - name: optional trivy
+        run: |
+          if command -v trivy >/dev/null 2>&1; then
+            trivy fs --exit-code 1 --severity HIGH,CRITICAL .
+          fi
+      - name: optional grype
+        run: |
+          if command -v grype >/dev/null 2>&1; then
+            grype . --fail-on high
+          fi
+      - name: optional checkov
+        run: |
+          if command -v checkov >/dev/null 2>&1; then
+            checkov -d .
+          fi
+      - name: optional tfsec
+        run: |
+          if command -v tfsec >/dev/null 2>&1; then
+            tfsec .
+          fi
+      - name: optional kics
+        run: |
+          if command -v kics >/dev/null 2>&1; then
+            kics scan --path .
+          fi
+      - name: optional trufflehog
+        run: |
+          if command -v trufflehog >/dev/null 2>&1; then
+            trufflehog filesystem --fail .
+          fi
+      - name: optional osv-scanner
+        run: |
+          if command -v osv-scanner >/dev/null 2>&1; then
+            osv-scanner --recursive .
+          fi
+      - name: optional syft
+        run: |
+          if command -v syft >/dev/null 2>&1; then
+            syft . -o cyclonedx-json > sbom.json
+          fi
+      - name: optional scancode
+        run: |
+          if command -v scancode >/dev/null 2>&1; then
+            scancode --license --json-pp dist/scancode.json .
+          fi
+      - name: optional fossa
+        run: |
+          if command -v fossa >/dev/null 2>&1; then
+            fossa test
+          fi
+
+  api-fuzz-config:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: test -f api/openapi.yaml -a -f schemathesis.toml
+      - name: optional schemathesis
+        run: |
+          if command -v schemathesis >/dev/null 2>&1; then
+            schemathesis run --config-file schemathesis.toml api/openapi.yaml
+          fi
+      - name: optional RESTler
+        run: |
+          if command -v restler >/dev/null 2>&1; then
+            restler compile --api_spec api/openapi.yaml
+          fi
+      - name: optional ZAP
+        run: |
+          if command -v zap-baseline.py >/dev/null 2>&1; then
+            zap-baseline.py -c zap.yaml -t http://127.0.0.1:8080
+          fi

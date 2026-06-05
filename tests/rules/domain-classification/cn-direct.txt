@@ -1,0 +1,9 @@
+# domain,expected_outbound,reason
+www.taobao.com,direct,cn-ecommerce
+item.jd.com,direct,cn-ecommerce
+www.baidu.com,direct,cn-search
+static.qq.com,direct,cn-portal
+cdn.bilibili.com,direct,cn-video
+api.xiaomi.com,direct,cn-vendor
+custom-direct.example.cn,direct,user-direct
+

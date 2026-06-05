@@ -1,0 +1,844 @@
+openapi: 3.0.3
+info:
+  title: sing-box-next-panel API
+  version: 0.1.0
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /api/v1/auth/passkeys/register-options:
+    post:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Passkey registration challenge}
+        "401": {description: Unauthorized}
+        "428": {description: Confirmation required}
+  /api/v1/auth/passkeys/register:
+    post:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Passkey credential registered}
+        "401": {description: Unauthorized}
+        "428": {description: Confirmation required}
+  /api/v1/auth/passkeys/authentication-options:
+    post:
+      responses:
+        "200": {description: Passkey authentication challenge}
+        "401": {description: Unauthorized}
+        "429": {description: Login rate limited}
+  /api/v1/auth/passkeys/authenticate:
+    post:
+      responses:
+        "200": {description: Passkey assertion verified}
+        "401": {description: Unauthorized}
+        "429": {description: Login rate limited}
+  /api/v1/nodes/register:
+    post:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Node registered}
+        "401": {description: Unauthorized}
+        "429": {description: Agent registration rate limited}
+  /api/v1/nodes:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Tenant nodes filtered by RBAC and node ABAC claims}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/nodes/{id}:
+    get:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Node detail filtered by tenant, region, tag, and environment ABAC}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "404": {description: Unknown node}
+  /api/v1/nodes/kernel-tuning:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Node kernel/sysctl tuning status for BBR, qdisc, nofile, somaxconn, tcp_fastopen, and port range}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/nodes/{id}/agent-credential:
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: One-time agent mTLS fingerprint credential}
+        "401": {description: Unauthorized}
+        "428": {description: Confirmation required}
+  /api/v1/nodes/{id}/heartbeat:
+    post:
+      security: [{AdminHeaders: []}, {AgentFingerprint: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Heartbeat accepted}
+        "401": {description: Unauthorized}
+  /api/v1/nodes/{id}/deploy-config:
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Config deployment started; response includes node-scoped payload hash and byte count, not rendered payload content}
+        "401": {description: Unauthorized}
+        "429": {description: Config deploy rate limited}
+  /api/v1/nodes/{id}/rollback:
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Node config rolled back to a previous version}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "428": {description: Confirmation required}
+  /api/v1/rules:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Active route rules}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+    post:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Rule published with compile diff and hit-change report}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "409": {description: Rule conflict blocked}
+  /api/v1/rules/compile:
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleCompileOptions"
+      responses:
+        "200": {description: Rule compile result without publishing}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/rules/test-domain:
+    get:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: query
+          name: input
+          schema: {type: string}
+      responses:
+        "200": {description: Classification}
+        "401": {description: Unauthorized}
+    post:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Classification}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+  /api/v1/rules/publish:
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleCompileOptions"
+      responses:
+        "200": {description: Rules published after classification and conflict tests with rolloutPercent constrained to 1, 5, 20, 50, or 100}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "409": {description: Rule conflict blocked}
+        "503": {description: Release paused by runbook}
+  /api/v1/rules/rollback:
+    post:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Rules rolled back to the previous safe policy}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/rules/rule-sets:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Tenant rule set sources with public HTTPS source URLs and checksums}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleSetSource"
+      responses:
+        "200": {description: Rule set source registered after SSRF and checksum validation}
+        "400": {description: Bad request or blocked SSRF target}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "428": {description: Confirmation required}
+  /api/v1/webhooks/endpoints:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Tenant webhook endpoints without signing secrets}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookEndpointRegistration"
+      responses:
+        "200": {description: Webhook endpoint registered after SSRF target validation}
+        "400": {description: Bad request or blocked SSRF target}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "428": {description: Confirmation required}
+  /api/v1/routes/trace:
+    post:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Route decision trace with matched rule and reason}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/routes/traces:
+    get:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: query
+          name: limit
+          schema: {type: integer, minimum: 1, maximum: 500}
+      responses:
+        "200": {description: Recent route decision traces}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/metrics/dependencies:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Dependency health and core API availability}
+        "401": {description: Unauthorized}
+  /api/v1/metrics/nodes/{id}:
+    get:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+        - in: query
+          name: limit
+          schema: {type: integer, minimum: 1, maximum: 500}
+      responses:
+        "200": {description: Recent in-memory node metric samples in chronological order}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden by tenant or node ABAC}
+        "404": {description: Unknown node}
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NodeMetricSample"
+      responses:
+        "200": {description: Node metric sample accepted into the in-memory time-series buffer}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden by tenant, scope, or node ABAC}
+        "404": {description: Unknown node}
+  /api/v1/warp/profiles:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: WARP profiles with encrypted private keys redacted}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+    post:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: WARP profile created with encrypted private key storage}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "428": {description: Confirmation required}
+  /api/v1/warp/profiles/import-wireguard:
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WarpWireGuardImport"
+      responses:
+        "200": {description: Standard WireGuard config imported as a WARP profile with PrivateKey encrypted and redacted}
+        "400": {description: Bad WireGuard config}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "428": {description: Confirmation required}
+  /api/v1/warp/profiles/{id}/probe:
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: WARP health probe recorded for scheduling}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+  /api/v1/warp/profiles/{id}/disable:
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: WARP profile disabled}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/argo/tunnels:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Tenant Argo tunnel metadata without Cloudflare secrets}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArgoTunnel"
+      responses:
+        "200": {description: Argo tunnel registered for local cloudflared config rendering}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "428": {description: Confirmation required}
+  /api/v1/argo/cloudflare/automation-plan:
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloudflareArgoAutomationRequest"
+      responses:
+        "200": {description: Token-free Cloudflare API tunnel creation/configuration/DNS automation plan}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "428": {description: Confirmation required}
+  /api/v1/argo/tunnels/{id}/config:
+    get:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Sanitized cloudflared ingress YAML without API tokens or URL userinfo}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "404": {description: Unknown tunnel}
+  /api/v1/metrics/overview:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Overview metrics including nodes, traffic, alerts, p99 latency, WARP, and dependency rows}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/metrics/capacity:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Capacity tier, API replica, autoscaling, and cost-aware scheduling recommendations}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/protocols/stats:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Aggregated inbound protocol stats for VLESS, VMess, Hysteria2, TUIC, and Trojan with node ABAC filtering}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/logs:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Sanitized operational log lines without secrets}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/audit-logs:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Tenant audit logs with hash-chain fields}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/alerts:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Tenant alerts with sanitized messages and node ABAC filtering}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/alerts/{id}/ack:
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Alert acknowledged and audit logged}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden by tenant, scope, or node ABAC}
+        "404": {description: Unknown alert}
+        "428": {description: Confirmation required}
+  /api/v1/security/waivers:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Security gate waivers with owner, expiration, and remediation plan}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SecurityWaiver"
+      responses:
+        "200": {description: Security waiver created, sanitized, and audit logged}
+        "400": {description: Missing owner, future expiration, gate, or remediation plan}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "428": {description: Confirmation required}
+  /api/v1/incidents:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Active and historical incidents}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/incidents/runbooks:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: P0/P1/P2/P3 runbook catalog with response targets and executable runbook names}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/incidents/{id}/runbook/{name}:
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+        - in: path
+          name: name
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Incident runbook executed}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+  /api/v1/subscriptions:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Subscriptions without token hashes}
+        "401": {description: Unauthorized}
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, clientType]
+              properties:
+                userId: {type: string}
+                clientType: {type: string, enum: [sing-box, clash, clash-meta, shadowrocket, v2rayn, nekobox]}
+                policyId: {type: string}
+                deviceId: {type: string, description: Device subscription context}
+                region: {type: string, description: Region subscription context}
+                protocol: {type: string, enum: [vless, vmess, hysteria2, tuic, trojan]}
+                outboundPolicy: {type: string, description: Rendered outbound policy or proxy group}
+                expiresInSeconds: {type: integer, format: int64}
+                tokenKind: {type: string, enum: [long, one-time]}
+                scope: {type: string, enum: [read]}
+                ipAllowlist:
+                  type: array
+                  items: {type: string}
+                usesRemaining: {type: integer}
+      responses:
+        "200": {description: Created subscription with one-time visible token and user/device/region/protocol/outbound-policy context}
+        "400": {description: Bad request}
+        "401": {description: Unauthorized}
+        "428": {description: Confirmation required}
+  /api/v1/subscriptions/conversions:
+    get:
+      security: [{AdminHeaders: []}]
+      responses:
+        "200": {description: Subscription conversion jobs with SSRF-safe source URLs and checksums}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+    post:
+      security: [{AdminHeaders: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscriptionConversionRequest"
+      responses:
+        "200": {description: Subscription conversion job registered after SSRF and checksum validation}
+        "400": {description: Bad request or blocked SSRF target}
+        "401": {description: Unauthorized}
+        "403": {description: Forbidden}
+        "428": {description: Confirmation required}
+  /api/v1/subscriptions/{id}/revoke:
+    post:
+      security: [{AdminHeaders: []}]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Subscription revoked}
+        "401": {description: Unauthorized}
+        "404": {description: Unknown subscription}
+        "428": {description: Confirmation required}
+  /sub/{token}/{client_type}:
+    get:
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema: {type: string}
+        - in: path
+          name: client_type
+          required: true
+          schema: {type: string}
+      responses:
+        "200": {description: Subscription content with ETag, Last-Modified, gzip, and brotli support}
+        "304": {description: Cached}
+        "404": {description: Unknown token}
+        "410": {description: Revoked}
+components:
+  securitySchemes:
+    AdminHeaders:
+      type: apiKey
+      in: header
+      name: X-User-ID
+      description: Requires X-User-ID, X-Tenant-ID, and X-Role. Optional X-ABAC-Regions, X-ABAC-Node-Tags, and X-ABAC-Environments narrow node access by region, tag, and environment.
+    AgentFingerprint:
+      type: apiKey
+      in: header
+      name: X-Agent-Cert-SHA256
+  schemas:
+    ArgoTunnel:
+      type: object
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        name: {type: string}
+        hostname: {type: string}
+        serviceUrl: {type: string}
+        cloudflareAccountId: {type: string}
+        cloudflareZoneId: {type: string}
+        tunnelId: {type: string}
+        status: {type: string}
+    CloudflareArgoAutomationRequest:
+      type: object
+      required: [hostname, serviceUrl, cloudflareAccountId, cloudflareZoneId]
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        name: {type: string}
+        hostname: {type: string}
+        serviceUrl: {type: string}
+        cloudflareAccountId: {type: string, description: 32-character Cloudflare account ID}
+        cloudflareZoneId: {type: string, description: 32-character Cloudflare zone ID}
+        tunnelId: {type: string, description: Optional existing Cloudflare tunnel ID; omitted plans use a TUNNEL_ID placeholder}
+    CloudflareArgoAutomationPlan:
+      type: object
+      properties:
+        tunnel:
+          $ref: "#/components/schemas/ArgoTunnel"
+        operations:
+          type: array
+          items:
+            $ref: "#/components/schemas/CloudflareAPIOperation"
+        tokenHandling: {type: string}
+        requiredScopes:
+          type: array
+          items: {type: string}
+        requiredApiToken:
+          type: object
+          properties:
+            storage: {type: string}
+            scopes:
+              type: array
+              items: {type: string}
+        generatedAt: {type: string, format: date-time}
+    CloudflareAPIOperation:
+      type: object
+      properties:
+        name: {type: string}
+        method: {type: string}
+        url: {type: string}
+        body: {type: object}
+    WarpProfile:
+      type: object
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        nodeId: {type: string}
+        name: {type: string}
+        source: {type: string, enum: [standard-wireguard-config, open-source-tool, wgcf, cloudflare-api]}
+        publicKey: {type: string}
+        peerPublicKey: {type: string}
+        endpoint: {type: string}
+        addresses:
+          type: array
+          items: {type: string}
+        dns:
+          type: array
+          items: {type: string}
+        allowedIPs:
+          type: array
+          items: {type: string}
+        encryptedPrivateKey: {type: string, description: Never returned by list or import responses}
+        status: {type: string}
+        weight: {type: number}
+    WarpWireGuardImport:
+      type: object
+      required: [config]
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        nodeId: {type: string}
+        name: {type: string}
+        config: {type: string, description: Standard WireGuard config containing Interface PrivateKey and Peer PublicKey/Endpoint/AllowedIPs}
+        weight: {type: number}
+    RuleSetSource:
+      type: object
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        name: {type: string}
+        sourceUrl: {type: string, description: Public HTTPS URL without userinfo, query, fragment, localhost, private IP, or link-local targets}
+        checksum: {type: string, description: sha256 hex checksum}
+        updatedAt: {type: string, format: date-time}
+    WebhookEndpoint:
+      type: object
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        name: {type: string}
+        targetUrl: {type: string, description: Public HTTPS URL without userinfo, query, fragment, localhost, private IP, or link-local targets}
+        eventTypes:
+          type: array
+          items: {type: string}
+        status: {type: string}
+        createdAt: {type: string, format: date-time}
+    WebhookEndpointRegistration:
+      type: object
+      required: [name, targetUrl, eventTypes]
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        name: {type: string}
+        targetUrl: {type: string, description: Public HTTPS URL without userinfo, query, fragment, localhost, private IP, or link-local targets}
+        eventTypes:
+          type: array
+          items: {type: string}
+        signingSecret: {type: string, writeOnly: true, description: Optional HMAC signing secret stored only as a hash and never returned}
+    SubscriptionConversion:
+      type: object
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        name: {type: string}
+        sourceUrl: {type: string, description: Public HTTPS URL without userinfo, query, fragment, localhost, private IP, or link-local targets}
+        sourceChecksum: {type: string, description: sha256 hex checksum for the source subscription content}
+        sourceClientType: {type: string, enum: [sing-box, clash, clash-meta, shadowrocket, v2rayn, nekobox]}
+        targetClientType: {type: string, enum: [sing-box, clash, clash-meta, shadowrocket, v2rayn, nekobox]}
+        deviceId: {type: string}
+        region: {type: string}
+        protocol: {type: string, enum: [vless, vmess, hysteria2, tuic, trojan]}
+        outboundPolicy: {type: string}
+        status: {type: string}
+        createdAt: {type: string, format: date-time}
+    SubscriptionConversionRequest:
+      type: object
+      required: [sourceUrl, sourceChecksum, targetClientType]
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        name: {type: string}
+        sourceUrl: {type: string, description: Public HTTPS URL without userinfo, query, fragment, localhost, private IP, or link-local targets}
+        sourceChecksum: {type: string, description: sha256 hex checksum for the source subscription content}
+        sourceClientType: {type: string, enum: [sing-box, clash, clash-meta, shadowrocket, v2rayn, nekobox]}
+        targetClientType: {type: string, enum: [sing-box, clash, clash-meta, shadowrocket, v2rayn, nekobox]}
+        deviceId: {type: string}
+        region: {type: string}
+        protocol: {type: string, enum: [vless, vmess, hysteria2, tuic, trojan]}
+        outboundPolicy: {type: string}
+    NodeMetricSample:
+      type: object
+      properties:
+        nodeId: {type: string}
+        tenantId: {type: string}
+        at: {type: string, format: date-time}
+        cpu: {type: number, minimum: 0, maximum: 1}
+        memory: {type: number, minimum: 0, maximum: 1}
+        loadAvg: {type: number, minimum: 0}
+        disk: {type: number, minimum: 0, maximum: 1}
+        fdUsage: {type: number, minimum: 0, maximum: 1}
+        rxBps: {type: integer, minimum: 0}
+        txBps: {type: integer, minimum: 0}
+        rxBytes: {type: integer, minimum: 0}
+        txBytes: {type: integer, minimum: 0}
+        networkPPS: {type: number, minimum: 0}
+        connections: {type: integer, minimum: 0}
+    ProtocolInboundStat:
+      type: object
+      properties:
+        protocol: {type: string, enum: [vless, vmess, hysteria2, tuic, trojan]}
+        connections: {type: integer, minimum: 0}
+        rxBps: {type: integer, minimum: 0}
+        txBps: {type: integer, minimum: 0}
+        errors: {type: integer, minimum: 0}
+    NodeKernelTuning:
+      type: object
+      properties:
+        nodeId: {type: string}
+        tenantId: {type: string}
+        region: {type: string}
+        congestionControl: {type: string}
+        queueDiscipline: {type: string}
+        noFile: {type: integer, minimum: 0}
+        somaxConn: {type: integer, minimum: 0}
+        tcpFastOpen: {type: integer, minimum: 0}
+        portRangeStart: {type: integer, minimum: 0}
+        portRangeEnd: {type: integer, minimum: 0}
+        tuned: {type: boolean}
+        issues:
+          type: array
+          items: {type: string}
+    Alert:
+      type: object
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        nodeId: {type: string}
+        severity: {type: string}
+        status: {type: string, enum: [open, acknowledged]}
+        message: {type: string, description: Secret-redacted and HTML-escaped alert message}
+        createdAt: {type: string, format: date-time}
+        acknowledgedAt: {type: string, format: date-time}
+        acknowledgedBy: {type: string}
+    RunbookDefinition:
+      type: object
+      properties:
+        severity: {type: string, enum: [P0, P1, P2, P3]}
+        incidentType: {type: string}
+        responseTarget: {type: string}
+        runbookNames:
+          type: array
+          items: {type: string}
+        primaryMitigate: {type: string}
+    SecurityWaiver:
+      type: object
+      required: [gate, owner, remediationPlan, expiresAt]
+      properties:
+        id: {type: string}
+        tenantId: {type: string}
+        gate: {type: string}
+        severity: {type: string}
+        owner: {type: string}
+        reason: {type: string}
+        remediationPlan: {type: string}
+        expiresAt: {type: string, format: date-time}
+        createdAt: {type: string, format: date-time}
+        createdBy: {type: string}
+    RuleCompileOptions:
+      type: object
+      properties:
+        defaultOutbound: {type: string, enum: [direct, proxy-default, warp-pool, block]}
+        rolloutPercent: {type: integer, enum: [1, 5, 20, 50, 100], description: Canary rollout percentage}
+        warpInclude:
+          type: array
+          items: {type: string}
+        warpExclude:
+          type: array
+          items: {type: string}
+        userDirect:
+          type: array
+          items: {type: string}
+        rules:
+          type: array
+          items:
+            type: object
+            properties:
+              id: {type: string}
+              priority: {type: integer}
+              type: {type: string, enum: [domain, domain_suffix, domain_keyword, domain_regex, geoip, rule_set, ip_cidr, process_name, port, protocol]}
+              matcher: {type: string}
+              outbound: {type: string, enum: [direct, proxy-default, warp-pool, block]}
+              source: {type: string}
+              enabled: {type: boolean}

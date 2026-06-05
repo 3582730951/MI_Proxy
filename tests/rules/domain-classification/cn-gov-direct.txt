@@ -1,0 +1,5 @@
+# domain,expected_outbound,reason
+www.gov.cn,direct,cn-government
+service.beijing.gov.cn,direct,cn-government
+portal.edu.cn,direct,cn-education
+

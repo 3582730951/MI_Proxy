@@ -1,0 +1,76 @@
+{
+  "checks": [
+    {
+      "name": "unauthenticated admin API denied",
+      "passed": true,
+      "detail": "POST /api/v1/nodes/register"
+    },
+    {
+      "name": "authenticated node registration available",
+      "passed": true,
+      "detail": "POST /api/v1/nodes/register"
+    },
+    {
+      "name": "xss payload json escaped",
+      "passed": true,
+      "detail": "{\"Input\":\"\\u003cscript\\u003ealert(1)\\u003c/script\\u003e\",\"Outbound\":\"proxy-default\",\"Reason\":\"final\",\"RuleID\":\"\",\"MatchedRule\":\"\",\"MatchedSource\":\"\",\"MatchedRuleTyp\":\"\"}\n"
+    },
+    {
+      "name": "security headers present",
+      "passed": true,
+      "detail": "CSP/nosniff/frame/referrer"
+    },
+    {
+      "name": "subscription token not reflected",
+      "passed": true,
+      "detail": "GET /sub/{token}/sing-box"
+    },
+    {
+      "name": "invalid subscription token rejected",
+      "passed": true,
+      "detail": "GET /sub/not-a-token/sing-box"
+    },
+    {
+      "name": "subscription conversion SSRF target blocked",
+      "passed": true,
+      "detail": "POST /api/v1/subscriptions/conversions metadata"
+    },
+    {
+      "name": "subscription conversion URL secret not reflected",
+      "passed": true,
+      "detail": "POST /api/v1/subscriptions/conversions query"
+    },
+    {
+      "name": "path traversal smoke has no 5xx",
+      "passed": true,
+      "detail": "GET /api/v1/logs?file=../../"
+    },
+    {
+      "name": "rule source SSRF target blocked",
+      "passed": true,
+      "detail": "POST /api/v1/rules/rule-sets localhost"
+    },
+    {
+      "name": "webhook SSRF target blocked",
+      "passed": true,
+      "detail": "POST /api/v1/webhooks/endpoints metadata"
+    },
+    {
+      "name": "webhook signing secret not reflected",
+      "passed": true,
+      "detail": "POST /api/v1/webhooks/endpoints"
+    },
+    {
+      "name": "metric node id mismatch blocked",
+      "passed": true,
+      "detail": "POST /api/v1/metrics/nodes/{id}"
+    },
+    {
+      "name": "wireguard private key not reflected",
+      "passed": true,
+      "detail": "POST /api/v1/warp/profiles/import-wireguard"
+    }
+  ],
+  "passed": true,
+  "mode": "local-dast-smoke"
+}

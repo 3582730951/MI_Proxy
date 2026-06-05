@@ -1,0 +1,61 @@
+{
+  "checks": [
+    {
+      "name": "node register before outage",
+      "passed": true,
+      "detail": "node registry"
+    },
+    {
+      "name": "offline alert after heartbeat loss",
+      "passed": true,
+      "detail": "30s offline, 2m alert"
+    },
+    {
+      "name": "postgres restart enters 60s degraded recovery window",
+      "passed": true,
+      "detail": "Degraded"
+    },
+    {
+      "name": "postgres outage past 60s becomes critical",
+      "passed": true,
+      "detail": "Critical"
+    },
+    {
+      "name": "redis outage keeps core APIs degraded for 5m",
+      "passed": true,
+      "detail": "local-fallback"
+    },
+    {
+      "name": "50 percent WARP failure remains schedulable",
+      "passed": true,
+      "detail": "warp-chaos-4"
+    },
+    {
+      "name": "failed WARP profiles enter cooldown",
+      "passed": true,
+      "detail": "cooldown profiles"
+    },
+    {
+      "name": "agent invalid config rollback",
+      "passed": true,
+      "detail": "config apply validation"
+    },
+    {
+      "name": "memory pressure degrades low resource node",
+      "passed": true,
+      "detail": "memory pressure \u003e 85%"
+    },
+    {
+      "name": "agent structured kernel tuning plan generated",
+      "passed": true,
+      "detail": "nofile/somaxconn/tcp_fastopen/port_range"
+    },
+    {
+      "name": "systemd watchdog heartbeat deadline",
+      "passed": true,
+      "detail": "watchdog deadline"
+    }
+  ],
+  "passed": true,
+  "mode": "local-chaos-smoke"
+}

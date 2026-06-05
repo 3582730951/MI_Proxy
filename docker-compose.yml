@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine@sha256:16bc17c64a573ef34162af9298258d1aec548232985b33ed7b1eac33ba35c229
+    environment:
+      POSTGRES_DB: sing_box_next
+      POSTGRES_USER: sing_box_next
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD or run scripts/install.sh}
+    ports:
+      - "${POSTGRES_BIND:-127.0.0.1}:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sing_box_next -d sing_box_next"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    ports:
+      - "${REDIS_BIND:-127.0.0.1}:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  control-plane:
+    build: .
+    command: ["-addr", "0.0.0.0:8080"]
+    environment:
+      DATABASE_URL: postgres://sing_box_next:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD or run scripts/install.sh}@postgres:5432/sing_box_next?sslmode=disable
+      REDIS_URL: redis://redis:6379/0
+      SING_BOX_NEXT_ENV: dev
+    ports:
+      - "${HOST:-127.0.0.1}:${PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

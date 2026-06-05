@@ -1,0 +1,29 @@
+env:
+  contexts:
+    - name: sing-box-next-panel
+      urls:
+        - http://127.0.0.1:8080
+      includePaths:
+        - http://127.0.0.1:8080/.*
+      excludePaths:
+        - http://127.0.0.1:8080/sub/.*
+  parameters:
+    failOnError: true
+    failOnWarning: false
+jobs:
+  - type: passiveScan-config
+    parameters:
+      maxAlertsPerRule: 10
+  - type: spider
+    parameters:
+      context: sing-box-next-panel
+      maxDuration: 5
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: dist
+      reportFile: zap-report.json
+

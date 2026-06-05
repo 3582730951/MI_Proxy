@@ -1,0 +1,98 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_ref:
+        description: "Release image reference, for example ghcr.io/owner/repo:tag"
+        required: true
+      main_branch_protected:
+        description: "Main branch protection is enabled"
+        required: true
+        default: "false"
+      human_review_approved:
+        description: "Human security/release review has approved"
+        required: true
+        default: "false"
+      gpt55_review_approved:
+        description: "GPT-5.5 architecture/security review has approved"
+        required: true
+        default: "false"
+      canary_24h_passed:
+        description: "24h canary completed with no P0/P1"
+        required: true
+        default: "false"
+      staging_dast_evidence:
+        description: "URL or artifact reference for full staging DAST"
+        required: true
+      full_load_evidence:
+        description: "URL or artifact reference for 2,000 RPS 30m load test"
+        required: true
+      toxiproxy_chaos_evidence:
+        description: "URL or artifact reference for DB/Redis toxiproxy chaos"
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  attestations: write
+  security-events: write
+
+jobs:
+  build-and-gate:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_REF: ${{ inputs.image_ref }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.x"
+      - run: go test ./...
+      - run: go run ./cmd/security-scan
+      - run: mkdir -p dist
+      - run: go run ./cmd/license-scan > dist/license-scan.json
+      - run: go run ./cmd/iac-scan > dist/iac-scan.json
+      - run: go run ./cmd/sbom > dist/sbom.json
+      - run: go run ./cmd/acceptance > dist/acceptance-local.json
+      - run: go run ./cmd/provenance dist/sbom.json dist/license-scan.json dist/iac-scan.json dist/acceptance-local.json > dist/provenance.local.json
+      - name: Local release evidence gate
+        shell: pwsh
+        run: ./scripts/release-gate.ps1 -EvidenceDir dist
+      - name: Build release image
+        run: docker build -t "$IMAGE_REF" .
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_REF }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+      - uses: sigstore/cosign-installer@v3
+      - name: Cosign keyless sign
+        run: cosign sign --yes "$IMAGE_REF"
+      - name: SLSA build provenance attestation
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/sbom.json
+            dist/license-scan.json
+            dist/iac-scan.json
+            dist/provenance.local.json
+      - name: External release evidence gate
+        shell: pwsh
+        env:
+          MAIN_BRANCH_PROTECTED: ${{ inputs.main_branch_protected }}
+          HUMAN_REVIEW_APPROVED: ${{ inputs.human_review_approved }}
+          GPT55_REVIEW_APPROVED: ${{ inputs.gpt55_review_approved }}
+          CANARY_24H_PASSED: ${{ inputs.canary_24h_passed }}
+          STAGING_DAST_EVIDENCE: ${{ inputs.staging_dast_evidence }}
+          FULL_LOAD_EVIDENCE: ${{ inputs.full_load_evidence }}
+          TOXIPROXY_CHAOS_EVIDENCE: ${{ inputs.toxiproxy_chaos_evidence }}
+          COSIGN_SIGNATURE_REF: ${{ env.IMAGE_REF }}
+          SLSA_PROVENANCE_REF: github-attestation
+        run: ./scripts/release-gate.ps1 -EvidenceDir dist -RequireExternalEvidence
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence
+          path: dist

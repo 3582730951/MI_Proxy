@@ -1,0 +1,32 @@
+{
+  "project": "sing-box-next-panel",
+  "generatedAt": "2026-06-05T08:06:08.186839596Z",
+  "gitCommit": "unavailable",
+  "gitHeadPresent": false,
+  "gitHeadError": "fatal: Needed a single revision",
+  "gitBranch": "main",
+  "gitStatus": "?? .dockerignore\n?? .github/\n?? .gitleaks.toml\n?? .semgrep.yml\n?? AGENTS.md\n?? Dockerfile\n?? Makefile\n?? agent/\n?? api/\n?? apps/\n?? cmd/\n?? dist/\n?? docker-compose.yml\n?? docs/\n?? example/\n?? go.mod\n?? go.sum\n?? internal/\n?? migrations/\n?? package.json\n?? packages/\n?? schemathesis.toml\n?? scripts/\n?? services/\n?? tests/\n?? zap.yaml",
+  "builder": "local-codex",
+  "artifacts": [
+    {
+      "path": "dist/sbom.container.json",
+      "sha256": "4c89e159ce209cea8de2b4d2a72184d6c13f12f69ad121bdb243f0d5feadfa2a"
+    },
+    {
+      "path": "dist/license-scan.container.json",
+      "sha256": "fb9f9c4d82d0750f3ef9999d7464f5eec8410a66ef62f66f86b7e50d9e9c4826"
+    },
+    {
+      "path": "dist/iac-scan.container.json",
+      "sha256": "e3598ce186b0176d3cccb0c8249ac1b92249ecce7daf8d9287d6e622ef1b76f6"
+    },
+    {
+      "path": "dist/acceptance-container.json",
+      "sha256": "6313554bae698c545572564577c845f33dad5ebb4696b2df58afbc2e0511c266"
+    }
+  ],
+  "publicKey": "QJgPJNuyjcqGusFoPe_-4-8ENZ9rouhWrUx1JuAPJwM",
+  "signature": "6BcVfavUsD9QW-Yct8EMAciEE22-r3NFMXWshp_KdGXTpT8OgBULY48x6QhjSxZHg-KqObOW3Kf2jxWkcrTfDQ",
+  "signatureAlg": "ed25519-local-ephemeral",
+  "mode": "local-provenance-smoke"
+}

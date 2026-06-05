@@ -1,0 +1,9 @@
+title = "sing-box-next-panel gitleaks config"
+
+[allowlist]
+description = "Test-only reserved IPs and deliberately fake sample values"
+paths = [
+  '''tests/.*''',
+  '''dist/.*''',
+]
+

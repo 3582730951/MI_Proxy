@@ -1,0 +1,3 @@
+# domain,expected_outbound,reason
+scholar.google.com,proxy-default,scholar-exclude-wins
+www.taobao.com,direct,cn-direct-wins
