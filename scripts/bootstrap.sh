@@ -98,7 +98,7 @@ scan_args_for_bootstrap() {
 apply_metadata_default() {
   key=$(printf '%s' "$1" | tr '[:lower:]-' '[:upper:]_')
   value=$2
-  [ -n "$value" ] || return
+  [ -n "$value" ] || return 0
   case "$key" in
     REPO_URL|MI_PANEL_REPO_URL) [ "$REPO_URL_CONFIGURED" = "1" ] || REPO_URL=$value ;;
     BRANCH|MI_PANEL_BRANCH) [ "$BRANCH_CONFIGURED" = "1" ] || BRANCH=$value ;;
@@ -114,7 +114,7 @@ apply_metadata_default() {
 }
 
 load_existing_metadata_for_bootstrap() {
-  [ -f "$META_FILE" ] || return
+  [ -f "$META_FILE" ] || return 0
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       ""|\#*) continue ;;
@@ -127,7 +127,7 @@ load_existing_metadata_for_bootstrap() {
 
 install_git_if_missing() {
   if command -v git >/dev/null 2>&1; then
-    return
+    return 0
   fi
   if command -v apt-get >/dev/null 2>&1; then
     env DEBIAN_FRONTEND=noninteractive apt-get update

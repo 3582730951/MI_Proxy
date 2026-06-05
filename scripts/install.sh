@@ -147,9 +147,9 @@ require_root_for_vps() {
 }
 
 install_packages() {
-  [ "$SKIP_DEPS" = "0" ] || return
+  [ "$SKIP_DEPS" = "0" ] || return 0
   if command -v docker >/dev/null 2>&1 && { docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1; } && command -v git >/dev/null 2>&1; then
-    return
+    return 0
   fi
   if command -v apt-get >/dev/null 2>&1; then
     run env DEBIAN_FRONTEND=noninteractive apt-get update
@@ -174,7 +174,7 @@ install_packages() {
 
 start_docker_service() {
   if [ "$SKIP_DEPS" = "1" ]; then
-    return
+    return 0
   fi
   if command -v systemctl >/dev/null 2>&1; then
     run systemctl enable --now docker || true
@@ -194,7 +194,7 @@ clone_or_update_repo() {
     run git -C "$INSTALL_DIR" fetch --prune origin "$BRANCH"
     run git -C "$INSTALL_DIR" checkout "$BRANCH"
     run git -C "$INSTALL_DIR" pull --ff-only origin "$BRANCH"
-    return
+    return 0
   fi
   if [ -e "$INSTALL_DIR" ] && [ "$(ls -A "$INSTALL_DIR" 2>/dev/null || true)" ]; then
     die "$INSTALL_DIR exists and is not an empty git checkout"
@@ -335,6 +335,10 @@ compose() {
 }
 
 start_stack() {
+  if [ "$DRY_RUN" = "1" ]; then
+    log "would start Docker Compose stack in $INSTALL_DIR"
+    return 0
+  fi
   load_env_file
   old_pwd=$(pwd)
   cd "$INSTALL_DIR"
@@ -368,7 +372,7 @@ rollback_to_previous_revision() {
 }
 
 write_metadata() {
-  [ "$DRY_RUN" = "0" ] || return
+  [ "$DRY_RUN" = "0" ] || return 0
   mkdir -p "$META_DIR"
   tmp="$META_FILE.tmp.$$"
   {
@@ -382,8 +386,8 @@ write_metadata() {
 }
 
 write_systemd_units() {
-  [ "$NO_SYSTEMD" = "0" ] || return
-  command -v systemctl >/dev/null 2>&1 || return
+  [ "$NO_SYSTEMD" = "0" ] || return 0
+  command -v systemctl >/dev/null 2>&1 || return 0
   [ "$DRY_RUN" = "0" ] || { log "would write systemd service and update timer"; return; }
   docker_bin=$(command -v docker || printf '/usr/bin/docker')
   if "$docker_bin" compose version >/dev/null 2>&1; then

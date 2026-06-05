@@ -110,7 +110,7 @@ run() {
 }
 
 acquire_lock() {
-  [ "$DRY_RUN" = "0" ] || return
+  [ "$DRY_RUN" = "0" ] || return 0
   mkdir -p "$LOCK_PARENT"
   if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     die "another update is already running"
@@ -149,7 +149,7 @@ current_revision() {
 update_repo() {
   [ -d "$INSTALL_DIR/.git" ] || die "$INSTALL_DIR is not a git checkout"
   if [ "$RESTART_ONLY" = "1" ]; then
-    return
+    return 0
   fi
   run git -C "$INSTALL_DIR" fetch --prune origin "$BRANCH"
   run git -C "$INSTALL_DIR" checkout "$BRANCH"
@@ -157,6 +157,10 @@ update_repo() {
 }
 
 deploy_stack() {
+  if [ "$DRY_RUN" = "1" ]; then
+    log "would rebuild and restart Docker Compose stack in $INSTALL_DIR"
+    return 0
+  fi
   load_env_file
   old_pwd=$(pwd)
   cd "$INSTALL_DIR"
@@ -165,7 +169,7 @@ deploy_stack() {
 }
 
 health_check() {
-  [ "$DRY_RUN" = "0" ] || return
+  [ "$DRY_RUN" = "0" ] || return 0
   url="http://127.0.0.1:${PORT:-8080}/healthz"
   i=0
   while [ "$i" -lt 60 ]; do
