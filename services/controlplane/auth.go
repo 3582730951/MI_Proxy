@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -33,6 +34,12 @@ type JWTHeader struct {
 	KeyID     string `json:"kid"`
 	Type      string `json:"typ"`
 }
+
+const passwordHashIterations = 120_000
+const passwordHashKeyLen = 32
+const passwordHashSaltLen = 16
+
+var errPasswordHashFormat = errors.New("invalid password hash format")
 
 func ValidateOIDCConfig(cfg OIDCConfig) error {
 	if !cfg.Enabled {
@@ -152,6 +159,77 @@ func TOTPForTest(secretBase32 string, now time.Time) string {
 func CsrfToken(userID string) string {
 	sum := sha256.Sum256([]byte("csrf-v1:" + userID))
 	return base64.RawURLEncoding.EncodeToString(sum[:16])
+}
+
+func NewPasswordHash(password string) (string, error) {
+	password = strings.TrimSpace(password)
+	if len(password) < 12 {
+		return "", errors.New("password must be at least 12 characters")
+	}
+	salt := make([]byte, passwordHashSaltLen)
+	if _, err := rand.Read(salt); err != nil {
+		return "", err
+	}
+	return EncodePasswordHash(password, salt, passwordHashIterations)
+}
+
+func EncodePasswordHash(password string, salt []byte, iterations int) (string, error) {
+	if iterations < 100_000 || len(salt) < passwordHashSaltLen {
+		return "", errPasswordHashFormat
+	}
+	derived := pbkdf2SHA256([]byte(password), salt, iterations, passwordHashKeyLen)
+	return strings.Join([]string{
+		"pbkdf2-sha256",
+		fmt.Sprintf("%d", iterations),
+		base64.RawURLEncoding.EncodeToString(salt),
+		base64.RawURLEncoding.EncodeToString(derived),
+	}, "$"), nil
+}
+
+func VerifyPasswordHash(encodedHash, password string) bool {
+	parts := strings.Split(strings.TrimSpace(encodedHash), "$")
+	if len(parts) != 4 || parts[0] != "pbkdf2-sha256" {
+		return false
+	}
+	iterations, err := strconv.Atoi(parts[1])
+	if err != nil || iterations < 100_000 {
+		return false
+	}
+	salt, err := base64.RawURLEncoding.DecodeString(parts[2])
+	if err != nil || len(salt) < passwordHashSaltLen {
+		return false
+	}
+	want, err := base64.RawURLEncoding.DecodeString(parts[3])
+	if err != nil || len(want) != passwordHashKeyLen {
+		return false
+	}
+	got := pbkdf2SHA256([]byte(password), salt, iterations, len(want))
+	return hmac.Equal(got, want)
+}
+
+func pbkdf2SHA256(password, salt []byte, iterations, keyLen int) []byte {
+	hashLen := sha256.Size
+	numBlocks := (keyLen + hashLen - 1) / hashLen
+	out := make([]byte, 0, numBlocks*hashLen)
+	for block := 1; block <= numBlocks; block++ {
+		mac := hmac.New(sha256.New, password)
+		_, _ = mac.Write(salt)
+		var counter [4]byte
+		binary.BigEndian.PutUint32(counter[:], uint32(block))
+		_, _ = mac.Write(counter[:])
+		u := mac.Sum(nil)
+		t := append([]byte(nil), u...)
+		for i := 1; i < iterations; i++ {
+			mac = hmac.New(sha256.New, password)
+			_, _ = mac.Write(u)
+			u = mac.Sum(nil)
+			for j := range t {
+				t[j] ^= u[j]
+			}
+		}
+		out = append(out, t...)
+	}
+	return out[:keyLen]
 }
 
 func NewSessionCookie(name string, expiresAt time.Time) (http.Cookie, error) {

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -25,6 +26,25 @@ func NewHTTPHandler(cp *ControlPlane) http.Handler {
 			return
 		}
 		writeJSON(w, map[string]string{"status": "ok"}, nil)
+	})
+	mux.HandleFunc("/api/v1/auth/login", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodPost) {
+			return
+		}
+		if err := cp.CheckRateLimit(RateLimitLogin, clientIP(r)); err != nil {
+			writeJSON(w, nil, err)
+			return
+		}
+		var req struct {
+			Username string `json:"username"`
+			Password string `json:"password"`
+		}
+		if err := decodeJSON(r, &req); err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		session, err := cp.PasswordLogin(req.Username, req.Password, clientIP(r))
+		writeJSON(w, session, err)
 	})
 	mux.HandleFunc("/api/v1/nodes/register", func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodPost) {
@@ -800,6 +820,18 @@ func NewHTTPHandler(cp *ControlPlane) http.Handler {
 		availability, err := cp.CoreAPIAvailability(ctx, ctx.User.TenantID)
 		writeJSON(w, availability, err)
 	})
+	mux.HandleFunc("/api/v1/system/runtime", func(w http.ResponseWriter, r *http.Request) {
+		if !requireMethod(w, r, http.MethodGet) {
+			return
+		}
+		ctx, err := cp.requestContext(r)
+		if err != nil {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		info, err := cp.RuntimeInfo(ctx, ctx.User.TenantID, clientIP(r))
+		writeJSON(w, info, err)
+	})
 	mux.HandleFunc("/api/v1/logs", func(w http.ResponseWriter, r *http.Request) {
 		if !requireMethod(w, r, http.MethodGet) {
 			return
@@ -953,7 +985,7 @@ func securityMiddleware(cp *ControlPlane, next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		if origin := r.Header.Get("Origin"); origin != "" {
-			if _, ok := cp.allowedOrigins[origin]; !ok {
+			if !cp.originAllowed(r, origin) {
 				http.Error(w, "origin not allowed", http.StatusForbidden)
 				return
 			}
@@ -974,6 +1006,27 @@ func securityMiddleware(cp *ControlPlane, next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (cp *ControlPlane) originAllowed(r *http.Request, origin string) bool {
+	if _, ok := cp.allowedOrigins[origin]; ok {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return false
+	}
+	return strings.EqualFold(parsed.Scheme, requestScheme(r)) && strings.EqualFold(parsed.Host, r.Host)
+}
+
+func requestScheme(r *http.Request) string {
+	if proto := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Forwarded-Proto"))); proto == "https" || proto == "http" {
+		return proto
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
 }
 
 func contentSecurityPolicy(path string) string {
@@ -1200,5 +1253,5 @@ func isStateChanging(r *http.Request) bool {
 }
 
 func isLoginPath(path string) bool {
-	return path == "/api/v1/auth/passkeys/authentication-options" || path == "/api/v1/auth/passkeys/authenticate"
+	return path == "/api/v1/auth/login" || path == "/api/v1/auth/passkeys/authentication-options" || path == "/api/v1/auth/passkeys/authenticate"
 }

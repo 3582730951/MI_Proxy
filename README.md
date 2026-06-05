@@ -38,6 +38,22 @@ http://<VPS_PUBLIC_IP>:8080
 
 控制面会直接在根路径提供 `apps/web` 运维面板；健康检查继续使用 `/healthz`。
 
+面板默认是中文界面，使用账号密码登录。安装脚本会在密码文件里生成初始管理员账号：
+
+```text
+MI_PANEL_ADMIN_USER=admin
+MI_PANEL_ADMIN_PASSWORD=<generated-secret>
+MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN=<generated-secret>
+```
+
+浏览器打开面板后，用户名填 `MI_PANEL_ADMIN_USER` 的值，密码填 `MI_PANEL_ADMIN_PASSWORD` 的值。`POSTGRES_PASSWORD` 只给数据库使用，不是面板登录密码。
+
+安装脚本也会生成一条默认订阅记录。订阅 token 属于敏感信息，不会在前端显示；需要给客户端导入时，在 VPS 上读取 `MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN`，按下面格式拼接：
+
+```text
+http://<VPS_PUBLIC_IP>:8080/sub/<MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN>/sing-box
+```
+
 项目不使用管道直接执行远程 shell 的安装方式。bootstrap 命令会先把脚本下载到本地临时文件，再执行本地文件。
 
 ## 常用复制命令
@@ -109,9 +125,19 @@ tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/sc
 
 ```text
 POSTGRES_PASSWORD=<generated-secret>
+MI_PANEL_ADMIN_USER=admin
+MI_PANEL_ADMIN_PASSWORD=<generated-secret>
+MI_PANEL_ADMIN_TENANT=tenant-a
+MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN=<generated-secret>
+MI_PANEL_DEFAULT_SUBSCRIPTION_USER=admin
+MI_PANEL_DEFAULT_SUBSCRIPTION_CLIENT=sing-box
+MI_PANEL_DEFAULT_SUBSCRIPTION_DEVICE=default
+MI_PANEL_DEFAULT_SUBSCRIPTION_REGION=auto
+MI_PANEL_DEFAULT_SUBSCRIPTION_PROTOCOL=vless
+MI_PANEL_DEFAULT_SUBSCRIPTION_OUTBOUND=proxy-default
 ```
 
-安装脚本会把非敏感运行配置写入 `.env`，把密码写入 `passwd.txt`，并设置文件权限为 `0600`。如果以后增加新的运行密码，也应该以 `KEY=VALUE` 形式追加到同一个密码文件，不要写入 `.env`。
+安装脚本会把非敏感运行配置写入 `.env`，把密码和默认订阅 token 写入 `passwd.txt`，并设置文件权限为 `0600`。前端面板默认中文，登录时使用 `MI_PANEL_ADMIN_USER` 和 `MI_PANEL_ADMIN_PASSWORD`；订阅 token 不会在面板显示。如果以后增加新的运行密码，也应该以 `KEY=VALUE` 形式追加到同一个密码文件，不要写入 `.env`。
 
 ## 自动更新
 

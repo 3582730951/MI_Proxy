@@ -330,6 +330,10 @@ canvas {
   margin-top: 12px;
 }
 
+.overview-details {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .stack {
   display: grid;
   gap: 8px;
@@ -411,6 +415,10 @@ pre {
   align-items: center;
 }
 
+.subscription-form {
+  grid-template-columns: repeat(4, minmax(140px, 1fr)) auto minmax(220px, 1fr);
+}
+
 .session-grid {
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   align-items: end;
@@ -446,11 +454,6 @@ button:focus-visible {
   filter: brightness(1.05);
 }
 
-body[data-auth-mode="bearer"] .auth-gateway,
-body[data-auth-mode="gateway"] .auth-bearer {
-  display: none;
-}
-
 @media (max-width: 920px) {
   .nav {
     position: static;
@@ -466,6 +469,7 @@ body[data-auth-mode="gateway"] .auth-bearer {
   .topbar,
   .split,
   .tool-row,
+  .overview-details,
   .overview-grid {
     grid-template-columns: 1fr;
     grid-template-areas: none;

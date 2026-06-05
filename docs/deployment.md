@@ -8,7 +8,7 @@ Run this one-command bootstrapper from a root shell on a fresh VPS when direct p
 tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp"
 ```
 
-The GitHub bootstrap path defaults the admin HTTP port to `0.0.0.0`, so the panel is reachable at `http://<VPS_PUBLIC_IP>:8080` after the host firewall and cloud security group allow TCP 8080. The control plane serves the bundled `apps/web` dashboard at `/`, while `/healthz` remains the deployment health endpoint. The bootstrapper installs only the minimum clone dependency when needed, checks out the repository into a temporary directory, and delegates to `scripts/install.sh` with the same arguments. For example:
+The GitHub bootstrap path defaults the admin HTTP port to `0.0.0.0`, so the panel is reachable at `http://<VPS_PUBLIC_IP>:8080` after the host firewall and cloud security group allow TCP 8080. The control plane serves the bundled Chinese `apps/web` dashboard at `/`, while `/healthz` remains the deployment health endpoint. The dashboard uses account/password login; use `MI_PANEL_ADMIN_USER` and `MI_PANEL_ADMIN_PASSWORD` from the generated password file. `POSTGRES_PASSWORD` is only for PostgreSQL and is not a panel password. The installer also seeds one default subscription whose token is stored as `MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN`; the frontend lists the subscription metadata but does not render the token. The bootstrapper installs only the minimum clone dependency when needed, checks out the repository into a temporary directory, and delegates to `scripts/install.sh` with the same arguments. For example:
 
 ```sh
 tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; echo "Downloading bootstrap script: $url"; if command -v curl >/dev/null 2>&1; then curl -fL --retry 3 -o "$tmp" "$url"; elif command -v wget >/dev/null 2>&1; then wget -O "$tmp" "$url"; else echo "curl or wget is required" >&2; exit 1; fi; test -s "$tmp" || { echo "downloaded bootstrap script is empty" >&2; exit 1; }; sh "$tmp" -l
@@ -63,9 +63,25 @@ Password file format:
 
 ```text
 POSTGRES_PASSWORD=<generated-secret>
+MI_PANEL_ADMIN_USER=admin
+MI_PANEL_ADMIN_PASSWORD=<generated-secret>
+MI_PANEL_ADMIN_TENANT=tenant-a
+MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN=<generated-secret>
+MI_PANEL_DEFAULT_SUBSCRIPTION_USER=admin
+MI_PANEL_DEFAULT_SUBSCRIPTION_CLIENT=sing-box
+MI_PANEL_DEFAULT_SUBSCRIPTION_DEVICE=default
+MI_PANEL_DEFAULT_SUBSCRIPTION_REGION=auto
+MI_PANEL_DEFAULT_SUBSCRIPTION_PROTOCOL=vless
+MI_PANEL_DEFAULT_SUBSCRIPTION_OUTBOUND=proxy-default
 ```
 
-Additional generated passwords must be added to the same file as `KEY=VALUE` entries. The installer and updater load `.env` first and then `PASSWD_FILE`, so Docker Compose receives secrets through the process environment without printing them.
+Additional generated passwords and subscription tokens must be added to the same file as `KEY=VALUE` entries. The installer and updater load `.env` first and then `PASSWD_FILE`, so Docker Compose receives secrets through the process environment without printing them. Older installs that only have `POSTGRES_PASSWORD` will receive `MI_PANEL_ADMIN_USER`, `MI_PANEL_ADMIN_PASSWORD`, `MI_PANEL_ADMIN_TENANT`, and default subscription keys during the next update.
+
+Default subscription URL format:
+
+```text
+http://<VPS_PUBLIC_IP>:8080/sub/<MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN>/sing-box
+```
 
 The project intentionally does not document pipe-to-shell installation. The bootstrapper downloads to a local temporary file before execution so the command stays inspectable and compatible with security scanning.
 

@@ -15,6 +15,8 @@ import (
 	"math"
 	"net"
 	"net/url"
+	"os"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -506,6 +508,35 @@ type APIToken struct {
 	CreatedAt   time.Time
 }
 
+type PasswordLoginConfig struct {
+	Username     string
+	Password     string
+	PasswordHash string
+	UserID       string
+	TenantID     string
+	Role         Role
+	TokenTTL     time.Duration
+}
+
+type PasswordCredential struct {
+	Username     string
+	UserID       string
+	TenantID     string
+	Role         Role
+	PasswordHash string
+}
+
+type PasswordLoginSession struct {
+	Authenticated     bool      `json:"authenticated"`
+	Token             string    `json:"token"`
+	UserID            string    `json:"userId"`
+	TenantID          string    `json:"tenantId"`
+	Role              Role      `json:"role"`
+	CSRFToken         string    `json:"csrfToken"`
+	ConfirmationToken string    `json:"confirmationToken"`
+	ExpiresAt         time.Time `json:"expiresAt"`
+}
+
 type AgentCredential struct {
 	ID              string
 	TenantID        string
@@ -628,42 +659,57 @@ type CapacityRecommendation struct {
 	Reasons                []string
 }
 
+type RuntimeInfo struct {
+	Hostname      string    `json:"hostname"`
+	OS            string    `json:"os"`
+	Arch          string    `json:"arch"`
+	GoVersion     string    `json:"goVersion"`
+	StartedAt     time.Time `json:"startedAt"`
+	Now           time.Time `json:"now"`
+	UptimeSeconds int64     `json:"uptimeSeconds"`
+	TenantID      string    `json:"tenantId"`
+	ClientIP      string    `json:"clientIp"`
+}
+
 type ControlPlane struct {
-	mu                sync.RWMutex
-	rulePublishMu     sync.Mutex
-	nodes             map[string]Node
-	configs           map[string]Config
-	currentConfigByT  map[string]string
-	deployments       map[string]Deployment
-	subscriptions     map[string]Subscription
-	subConversions    map[string]SubscriptionConversion
-	alerts            []Alert
-	auditLogs         []AuditLog
-	routeTraces       []RouteDecisionTrace
-	apiTokens         map[string]APIToken
-	agentCredentials  map[string]AgentCredential
-	passkeys          map[string]PasskeyCredential
-	passkeyChallenges map[string]PasskeyChallenge
-	warpProfiles      map[string]WarpProfile
-	argoTunnels       map[string]ArgoTunnel
-	ruleSetSources    map[string]RuleSetSource
-	webhookEndpoints  map[string]WebhookEndpoint
-	nodeMetricSamples []NodeMetricSample
-	stickyByDomain    map[string]string
-	stickyByUser      map[string]string
-	weightedCursor    map[string]int
-	targetCache       map[string]GeoInfo
-	taskStates        map[string]string
-	runbookStates     map[string]RunbookState
-	securityWaivers   map[string]SecurityWaiver
-	ruleRolloutByT    map[string]int
-	rateWindows       map[string]rateWindow
-	dependencies      map[DependencyName]DependencyHealth
-	rulePolicy        *rulecompiler.CompiledPolicy
-	versionByTenant   map[string]int
-	envelopeKey       [32]byte
-	allowedOrigins    map[string]struct{}
-	now               func() time.Time
+	mu                 sync.RWMutex
+	rulePublishMu      sync.Mutex
+	nodes              map[string]Node
+	configs            map[string]Config
+	currentConfigByT   map[string]string
+	deployments        map[string]Deployment
+	subscriptions      map[string]Subscription
+	subConversions     map[string]SubscriptionConversion
+	alerts             []Alert
+	auditLogs          []AuditLog
+	routeTraces        []RouteDecisionTrace
+	apiTokens          map[string]APIToken
+	passwordLogins     map[string]PasswordCredential
+	agentCredentials   map[string]AgentCredential
+	passkeys           map[string]PasskeyCredential
+	passkeyChallenges  map[string]PasskeyChallenge
+	warpProfiles       map[string]WarpProfile
+	argoTunnels        map[string]ArgoTunnel
+	ruleSetSources     map[string]RuleSetSource
+	webhookEndpoints   map[string]WebhookEndpoint
+	nodeMetricSamples  []NodeMetricSample
+	stickyByDomain     map[string]string
+	stickyByUser       map[string]string
+	weightedCursor     map[string]int
+	targetCache        map[string]GeoInfo
+	taskStates         map[string]string
+	runbookStates      map[string]RunbookState
+	securityWaivers    map[string]SecurityWaiver
+	ruleRolloutByT     map[string]int
+	rateWindows        map[string]rateWindow
+	dependencies       map[DependencyName]DependencyHealth
+	rulePolicy         *rulecompiler.CompiledPolicy
+	versionByTenant    map[string]int
+	envelopeKey        [32]byte
+	allowedOrigins     map[string]struct{}
+	passwordSessionTTL time.Duration
+	startedAt          time.Time
+	now                func() time.Time
 }
 
 type SubscriptionOptions struct {
@@ -675,6 +721,22 @@ type SubscriptionOptions struct {
 	Region         string
 	Protocol       string
 	OutboundPolicy string
+}
+
+type DefaultSubscriptionConfig struct {
+	ID             string
+	Token          string
+	UserID         string
+	TenantID       string
+	ClientType     string
+	DeviceID       string
+	Region         string
+	Protocol       string
+	OutboundPolicy string
+	TokenKind      string
+	Scope          string
+	IPAllowlist    []string
+	ExpiresAt      time.Time
 }
 
 type rateWindow struct {
@@ -712,38 +774,42 @@ func New(now func() time.Time) *ControlPlane {
 	if now == nil {
 		now = func() time.Time { return time.Now().UTC() }
 	}
+	startedAt := now()
 	policy, _ := rulecompiler.Compile(rulecompiler.CompileOptions{
 		WarpInclude: []string{"example-warp-target.com"},
 	})
 	cp := &ControlPlane{
-		nodes:             map[string]Node{},
-		configs:           map[string]Config{},
-		currentConfigByT:  map[string]string{},
-		deployments:       map[string]Deployment{},
-		subscriptions:     map[string]Subscription{},
-		subConversions:    map[string]SubscriptionConversion{},
-		apiTokens:         map[string]APIToken{},
-		agentCredentials:  map[string]AgentCredential{},
-		passkeys:          map[string]PasskeyCredential{},
-		passkeyChallenges: map[string]PasskeyChallenge{},
-		warpProfiles:      map[string]WarpProfile{},
-		argoTunnels:       map[string]ArgoTunnel{},
-		ruleSetSources:    map[string]RuleSetSource{},
-		webhookEndpoints:  map[string]WebhookEndpoint{},
-		stickyByDomain:    map[string]string{},
-		stickyByUser:      map[string]string{},
-		weightedCursor:    map[string]int{},
-		targetCache:       map[string]GeoInfo{},
-		taskStates:        map[string]string{},
-		runbookStates:     map[string]RunbookState{},
-		securityWaivers:   map[string]SecurityWaiver{},
-		ruleRolloutByT:    map[string]int{},
-		rateWindows:       map[string]rateWindow{},
-		dependencies:      defaultDependencyHealth(now()),
-		rulePolicy:        policy,
-		versionByTenant:   map[string]int{},
-		allowedOrigins:    map[string]struct{}{"http://127.0.0.1:8080": {}, "http://localhost:8080": {}},
-		now:               now,
+		nodes:              map[string]Node{},
+		configs:            map[string]Config{},
+		currentConfigByT:   map[string]string{},
+		deployments:        map[string]Deployment{},
+		subscriptions:      map[string]Subscription{},
+		subConversions:     map[string]SubscriptionConversion{},
+		apiTokens:          map[string]APIToken{},
+		passwordLogins:     map[string]PasswordCredential{},
+		agentCredentials:   map[string]AgentCredential{},
+		passkeys:           map[string]PasskeyCredential{},
+		passkeyChallenges:  map[string]PasskeyChallenge{},
+		warpProfiles:       map[string]WarpProfile{},
+		argoTunnels:        map[string]ArgoTunnel{},
+		ruleSetSources:     map[string]RuleSetSource{},
+		webhookEndpoints:   map[string]WebhookEndpoint{},
+		stickyByDomain:     map[string]string{},
+		stickyByUser:       map[string]string{},
+		weightedCursor:     map[string]int{},
+		targetCache:        map[string]GeoInfo{},
+		taskStates:         map[string]string{},
+		runbookStates:      map[string]RunbookState{},
+		securityWaivers:    map[string]SecurityWaiver{},
+		ruleRolloutByT:     map[string]int{},
+		rateWindows:        map[string]rateWindow{},
+		dependencies:       defaultDependencyHealth(startedAt),
+		rulePolicy:         policy,
+		versionByTenant:    map[string]int{},
+		allowedOrigins:     map[string]struct{}{"http://127.0.0.1:8080": {}, "http://localhost:8080": {}},
+		passwordSessionTTL: 12 * time.Hour,
+		startedAt:          startedAt,
+		now:                now,
 	}
 	if _, err := rand.Read(cp.envelopeKey[:]); err != nil {
 		panic(err)
@@ -1537,6 +1603,64 @@ func (cp *ControlPlane) CreateSubscriptionWithOptions(ctx RequestContext, tenant
 	cp.subscriptions[sub.ID] = sub
 	cp.auditLocked(ctx, tenantID, "subscription.create", "subscription", sub.ID)
 	return sub, token, nil
+}
+
+func (cp *ControlPlane) ConfigureDefaultSubscription(cfg DefaultSubscriptionConfig) (Subscription, error) {
+	token := strings.TrimSpace(cfg.Token)
+	if !safeSubscriptionSeedToken(token) {
+		return Subscription{}, ErrBadRequest
+	}
+	tenantID := strings.TrimSpace(cfg.TenantID)
+	if tenantID == "" {
+		tenantID = "tenant-a"
+	}
+	userID := sanitizeSubscriptionField(cfg.UserID, 64)
+	if userID == "" {
+		userID = "admin"
+	}
+	clientType := normalizeSubscriptionClientType(cfg.ClientType)
+	if clientType == "" {
+		clientType = "sing-box"
+	}
+	tokenKind := sanitizeSubscriptionField(cfg.TokenKind, 32)
+	if tokenKind == "" {
+		tokenKind = "long"
+	}
+	scope := sanitizeSubscriptionField(cfg.Scope, 32)
+	if scope == "" {
+		scope = "read"
+	}
+	sub := Subscription{
+		ID:             nonEmpty(sanitizeSubscriptionField(cfg.ID, 64), "sub-default"),
+		TenantID:       tenantID,
+		UserID:         userID,
+		TokenHash:      HashToken(token),
+		TokenKind:      tokenKind,
+		Scope:          scope,
+		IPAllowlist:    append([]string(nil), cfg.IPAllowlist...),
+		ClientType:     clientType,
+		DeviceID:       nonEmpty(sanitizeSubscriptionField(cfg.DeviceID, 64), "default"),
+		Region:         nonEmpty(sanitizeSubscriptionField(cfg.Region, 32), "auto"),
+		Protocol:       normalizeSubscriptionProtocol(cfg.Protocol),
+		OutboundPolicy: normalizeSubscriptionOutboundPolicy(cfg.OutboundPolicy),
+		ExpiresAt:      cfg.ExpiresAt,
+		CreatedAt:      cp.now(),
+	}
+	ctx := RequestContext{
+		User: User{
+			ID:       "system",
+			TenantID: tenantID,
+			Role:     RoleOwner,
+		},
+		IP:        net.IPv4zero,
+		Confirmed: true,
+	}
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	cp.subscriptions[sub.ID] = sub
+	cp.auditLocked(ctx, tenantID, "subscription.seed", "subscription", sub.ID)
+	sub.TokenHash = ""
+	return sub, nil
 }
 
 func (cp *ControlPlane) ListSubscriptions(ctx RequestContext, tenantID string) ([]Subscription, error) {
@@ -2769,6 +2893,28 @@ func (cp *ControlPlane) CoreAPIAvailability(ctx RequestContext, tenantID string)
 	return cp.coreAPIAvailabilityLocked(cp.now()), nil
 }
 
+func (cp *ControlPlane) RuntimeInfo(ctx RequestContext, tenantID, clientIP string) (RuntimeInfo, error) {
+	if err := authorize(ctx.User, "metrics:read", tenantID); err != nil {
+		return RuntimeInfo{}, err
+	}
+	if err := requireScope(ctx, "metrics:read"); err != nil {
+		return RuntimeInfo{}, err
+	}
+	now := cp.now()
+	hostname, _ := os.Hostname()
+	return RuntimeInfo{
+		Hostname:      sanitizeRuntimeField(hostname, 128),
+		OS:            runtime.GOOS,
+		Arch:          runtime.GOARCH,
+		GoVersion:     runtime.Version(),
+		StartedAt:     cp.startedAt,
+		Now:           now,
+		UptimeSeconds: int64(now.Sub(cp.startedAt).Seconds()),
+		TenantID:      tenantID,
+		ClientIP:      sanitizeRuntimeField(clientIP, 64),
+	}, nil
+}
+
 func (cp *ControlPlane) RecordNodeMetric(ctx RequestContext, sample NodeMetricSample) (NodeMetricSample, error) {
 	sample.NodeID = strings.TrimSpace(sample.NodeID)
 	if sample.NodeID == "" {
@@ -3551,6 +3697,104 @@ func (cp *ControlPlane) AuthenticateAPIToken(token, ip string) (RequestContext, 
 	return RequestContext{}, ErrUnauthorized
 }
 
+func (cp *ControlPlane) ConfigurePasswordLogin(cfg PasswordLoginConfig) error {
+	username := normalizeLoginName(cfg.Username)
+	if username == "" {
+		return ErrBadRequest
+	}
+	userID := strings.TrimSpace(cfg.UserID)
+	if userID == "" {
+		userID = username
+	}
+	tenantID := strings.TrimSpace(cfg.TenantID)
+	if tenantID == "" {
+		tenantID = "tenant-a"
+	}
+	role := cfg.Role
+	if role == "" {
+		role = RoleAdmin
+	}
+	passwordHash := strings.TrimSpace(cfg.PasswordHash)
+	if passwordHash == "" {
+		var err error
+		passwordHash, err = NewPasswordHash(cfg.Password)
+		if err != nil {
+			return ErrBadRequest
+		}
+	} else if !VerifyPasswordHash(passwordHash, cfg.Password) && strings.TrimSpace(cfg.Password) != "" {
+		return ErrBadRequest
+	}
+	ttl := cfg.TokenTTL
+	if ttl <= 0 {
+		ttl = 12 * time.Hour
+	}
+	cp.mu.Lock()
+	defer cp.mu.Unlock()
+	cp.passwordLogins[username] = PasswordCredential{
+		Username:     username,
+		UserID:       userID,
+		TenantID:     tenantID,
+		Role:         role,
+		PasswordHash: passwordHash,
+	}
+	cp.passwordSessionTTL = ttl
+	return nil
+}
+
+func (cp *ControlPlane) PasswordLogin(username, password, ip string) (PasswordLoginSession, error) {
+	username = normalizeLoginName(username)
+	if username == "" || password == "" {
+		return PasswordLoginSession{}, ErrUnauthorized
+	}
+	cp.mu.RLock()
+	credential, ok := cp.passwordLogins[username]
+	cp.mu.RUnlock()
+	if !ok || !VerifyPasswordHash(credential.PasswordHash, password) {
+		return PasswordLoginSession{}, ErrUnauthorized
+	}
+	expiresAt := cp.now().Add(cp.passwordSessionTTL)
+	ctx := RequestContext{
+		User: User{
+			ID:       credential.UserID,
+			TenantID: credential.TenantID,
+			Role:     credential.Role,
+		},
+		IP:        net.ParseIP(ip),
+		Confirmed: true,
+	}
+	_, token, err := cp.CreateAPIToken(ctx, credential.TenantID, credential.Role, nil, nil, expiresAt)
+	if err != nil {
+		return PasswordLoginSession{}, err
+	}
+	return PasswordLoginSession{
+		Authenticated:     true,
+		Token:             token,
+		UserID:            credential.UserID,
+		TenantID:          credential.TenantID,
+		Role:              credential.Role,
+		CSRFToken:         CsrfToken(credential.UserID),
+		ConfirmationToken: ConfirmationToken(credential.UserID),
+		ExpiresAt:         expiresAt,
+	}, nil
+}
+
+func normalizeLoginName(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" || len(value) > 128 {
+		return ""
+	}
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_' || r == '.' || r == '@':
+		default:
+			return ""
+		}
+	}
+	return value
+}
+
 func (cp *ControlPlane) DecryptWarpPrivateKey(ctx RequestContext, profileID string) (string, error) {
 	cp.mu.RLock()
 	profile, ok := cp.warpProfiles[profileID]
@@ -4238,6 +4482,39 @@ func sanitizeSubscriptionField(value string, maxLen int) string {
 		case r == '-' || r == '_' || r == '.' || r == '@':
 			b.WriteRune(r)
 		}
+	}
+	return b.String()
+}
+
+func safeSubscriptionSeedToken(token string) bool {
+	token = strings.TrimSpace(token)
+	if len(token) < 32 || len(token) > 256 {
+		return false
+	}
+	for _, r := range token {
+		switch {
+		case r >= 'a' && r <= 'z':
+		case r >= 'A' && r <= 'Z':
+		case r >= '0' && r <= '9':
+		case r == '-' || r == '_':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func sanitizeRuntimeField(value string, maxLen int) string {
+	value = strings.TrimSpace(value)
+	var b strings.Builder
+	for _, r := range value {
+		if maxLen > 0 && b.Len() >= maxLen {
+			break
+		}
+		if r < 32 || r == 127 {
+			continue
+		}
+		b.WriteRune(r)
 	}
 	return b.String()
 }

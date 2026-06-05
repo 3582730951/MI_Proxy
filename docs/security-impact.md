@@ -1,10 +1,10 @@
 # Security impact analysis
 
 ## Controls implemented locally
-- Admin HTTP APIs require `X-User-ID`, `X-Tenant-ID`, and `X-Role`; unauthenticated admin requests return 401.
+- Admin HTTP APIs require a valid authenticated context from either trusted gateway headers or a short-lived Bearer token issued by account/password login; unauthenticated admin requests return 401.
 - RBAC blocks cross-tenant access and operator write actions.
 - Node ABAC limits node reads, registration, heartbeat, config deployment, agent credential rotation, and overview metrics by tenant, region, node tag, and environment.
-- API tokens are hashed at rest, scoped, expiring, and optionally IP allowlisted.
+- API tokens are hashed at rest, scoped, expiring, and optionally IP allowlisted. Account/password login stores only PBKDF2-HMAC-SHA256 password hashes and issues short-lived Bearer tokens rather than exposing trusted gateway headers in the frontend.
 - Agent mTLS client certificate fingerprints are hashed at rest, rotated through the control plane, and accepted only for node heartbeat updates.
 - OIDC/OAuth2 configuration validation requires HTTPS issuer and redirect URLs.
 - OIDC JWT header hardening rejects `alg=none`, non-allowlisted algorithms, malformed tokens, and unsafe `kid` values before key lookup.
@@ -14,6 +14,7 @@
 - Rate limits protect login attempts, subscription rendering, config deployment, and Agent registration surfaces.
 - Sensitive write operations require a deterministic second confirmation token in the local implementation.
 - Subscription tokens are generated randomly, stored as hashes, and can be revoked individually.
+- The install-time default subscription token is generated into the mode-0600 password file, stored only as a hash inside the control plane, and never rendered by the frontend.
 - Successful subscription renders append token-free `subscription.access` audit records with the subscription resource ID and client IP, never the raw token or token hash.
 - Subscription conversion job registration blocks SSRF-prone source URLs, rejects URL userinfo/query/fragment secrets, requires a sha256 source checksum, requires confirmation, and records only a queued conversion job rather than fetching remote content inside the control plane.
 - WARP private keys are envelope-encrypted before in-memory persistence and redacted from API list responses.
@@ -36,7 +37,7 @@
 - Local security scan blocks private key material, obvious cloud keys, weak password assignments, shell-string command execution, raw command execution outside `internal/safeexec`, and curl-pipe-bash patterns.
 - Local license scan blocks unknown external dependency licenses and known incompatible licenses; the only current third-party Go dependency is explicitly reviewed as MIT.
 - Provenance git commands use `internal/safeexec` with exact command and argument allowlists instead of shell strings or path-based command names.
-- Docker Compose requires a caller-supplied or install-script-generated database password and binds Postgres, Redis, and the control plane to localhost by default. The one-command VPS bootstrapper downloads to a temporary file before execution, installs only the minimum clone dependency when needed, and delegates to the noninteractive installer. The installer avoids pipe-to-shell execution, stores generated passwords in a mode-0600 `passwd.txt` under the runtime directory by default with a configurable `PASSWD_FILE`, keeps non-secret runtime settings in `.env`, and registers an auto-update timer only through a local script that fast-forwards git, checks `/healthz`, and rolls back on failed deployment health.
+- Docker Compose requires caller-supplied or install-script-generated database and panel admin passwords and binds Postgres, Redis, and the control plane to localhost by default. The one-command VPS bootstrapper downloads to a temporary file before execution, installs only the minimum clone dependency when needed, and delegates to the noninteractive installer. The installer avoids pipe-to-shell execution, stores generated passwords in a mode-0600 `passwd.txt` under the runtime directory by default with a configurable `PASSWD_FILE`, keeps non-secret runtime settings in `.env`, and registers an auto-update timer only through a local script that fast-forwards git, checks `/healthz`, and rolls back on failed deployment health.
 - Local IaC scan enforces non-root Docker runtime, requires `@sha256` digest-pinned Dockerfile and Compose images, rejects `latest` images, and verifies secure Compose defaults before release evidence is accepted.
 - CORS is allowlisted and cross-origin state-changing browser requests require a CSRF token.
 - HTTP responses include strict CSP, frame-denial, no-referrer, same-origin resource, and no-sniff security headers; DAST smoke checks these headers.

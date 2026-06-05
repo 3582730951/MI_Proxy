@@ -11,18 +11,18 @@ func TestDashboardIncludesProductionNavigationAndMountPoints(t *testing.T) {
 	html := readAsset(t, "index.html")
 
 	for _, label := range []string{
-		"Overview",
-		"Nodes",
-		"Routes &amp; Rules",
-		"Subscriptions",
-		"WARP Pool",
-		"Protocols",
-		"Traffic",
-		"Observability",
-		"Security",
-		"Deployments",
-		"Incidents",
-		"Settings",
+		"总览",
+		"节点",
+		"规则与路由",
+		"订阅",
+		"WARP 池",
+		"协议",
+		"流量",
+		"可观测",
+		"安全",
+		"部署",
+		"事件",
+		"设置",
 	} {
 		if !strings.Contains(html, label) {
 			t.Fatalf("missing navigation label %q", label)
@@ -31,10 +31,14 @@ func TestDashboardIncludesProductionNavigationAndMountPoints(t *testing.T) {
 
 	for _, id := range []string{
 		"sessionForm",
+		"usernameInput",
+		"passwordInput",
 		"metricGrid",
 		"trafficMap",
+		"runtimeInfo",
 		"nodeBody",
 		"routeTraceBody",
+		"subscriptionForm",
 		"subscriptionBody",
 		"warpBody",
 		"protocolGrid",
@@ -44,6 +48,9 @@ func TestDashboardIncludesProductionNavigationAndMountPoints(t *testing.T) {
 		if !strings.Contains(html, `id="`+id+`"`) {
 			t.Fatalf("missing production data mount point %s", id)
 		}
+	}
+	if !strings.Contains(html, `lang="zh-CN"`) || !strings.Contains(html, "账号登录") {
+		t.Fatal("dashboard must default to Chinese account/password login")
 	}
 	if strings.Count(html, "<canvas") < 7 {
 		t.Fatalf("dashboard has too few live chart canvases")
@@ -82,6 +89,8 @@ func TestDashboardUsesAuthenticatedAPIDataAndLiveMap(t *testing.T) {
 	js := readAsset(t, "app.js")
 	for _, required := range []string{
 		"fetch(`${apiBase()}${path}`",
+		"/api/v1/auth/login",
+		"/api/v1/system/runtime",
 		"headers.Authorization",
 		"sessionStorage",
 		"/api/v1/metrics/overview",
@@ -95,6 +104,19 @@ func TestDashboardUsesAuthenticatedAPIDataAndLiveMap(t *testing.T) {
 	} {
 		if !strings.Contains(js, required) {
 			t.Fatalf("dashboard missing live API/map behavior %s", required)
+		}
+	}
+	combined := readAsset(t, "index.html") + "\n" + js
+	for _, forbidden := range []string{
+		"authModeInput",
+		"apiTokenInput",
+		"Trusted gateway",
+		"Bearer token",
+		"Auth mode",
+		"subscriptionResult.textContent = token",
+	} {
+		if strings.Contains(combined, forbidden) {
+			t.Fatalf("dashboard still exposes obsolete or sensitive auth UI %q", forbidden)
 		}
 	}
 }

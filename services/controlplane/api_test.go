@@ -8,6 +8,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -47,7 +48,7 @@ func TestHTTPDashboardServedAtRoot(t *testing.T) {
 	if contentType := root.Header().Get("Content-Type"); !strings.HasPrefix(contentType, "text/html") {
 		t.Fatalf("dashboard root content-type=%q, want text/html", contentType)
 	}
-	if body := root.Body.String(); !strings.Contains(body, "Sing-Box Pro") || !strings.Contains(body, "Overview") {
+	if body := root.Body.String(); !strings.Contains(body, "MI Proxy") || !strings.Contains(body, "总览") {
 		t.Fatalf("dashboard root missing expected markup: %s", body)
 	}
 	csp := root.Header().Get("Content-Security-Policy")
@@ -69,6 +70,101 @@ func TestHTTPDashboardServedAtRoot(t *testing.T) {
 	}
 }
 
+func TestHTTPPasswordLoginReturnsBearerSession(t *testing.T) {
+	now := time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC)
+	cp := New(func() time.Time { return now })
+	secret := "correct horse battery staple"
+	if err := cp.ConfigurePasswordLogin(PasswordLoginConfig{
+		Username: "admin",
+		Password: secret,
+		TenantID: "tenant-a",
+		Role:     RoleAdmin,
+	}); err != nil {
+		t.Fatalf("configure password login: %v", err)
+	}
+	server := NewHTTPHandler(cp)
+
+	badLogin := expectStatus(t, server, http.MethodPost, "/api/v1/auth/login", `{"username":"admin","password":"wrong password value"}`, nil, http.StatusUnauthorized)
+	if strings.Contains(badLogin.Body.String(), "wrong password value") {
+		t.Fatalf("bad login response leaked password: %s", badLogin.Body.String())
+	}
+
+	login := expectStatus(t, server, http.MethodPost, "/api/v1/auth/login", `{"username":"admin","password":"correct horse battery staple"}`, nil, http.StatusOK)
+	if strings.Contains(login.Body.String(), secret) {
+		t.Fatalf("login response leaked password: %s", login.Body.String())
+	}
+	var session PasswordLoginSession
+	if err := json.Unmarshal(login.Body.Bytes(), &session); err != nil {
+		t.Fatalf("decode login response: %v", err)
+	}
+	if !session.Authenticated || session.Token == "" || session.UserID != "admin" || session.TenantID != "tenant-a" || session.Role != RoleAdmin || !session.ExpiresAt.Equal(now.Add(12*time.Hour)) {
+		t.Fatalf("login response missing session fields: %+v", session)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/rules/test-domain?input=scholar.google.com", nil)
+	req.Header.Set("Authorization", "Bearer "+session.Token)
+	res := httptest.NewRecorder()
+	server.ServeHTTP(res, req)
+	if res.Code != http.StatusOK {
+		t.Fatalf("bearer session status=%d body=%s", res.Code, res.Body.String())
+	}
+
+	unauthRuntime := expectStatus(t, server, http.MethodGet, "/api/v1/system/runtime", "", nil, http.StatusUnauthorized)
+	if strings.Contains(unauthRuntime.Body.String(), secret) {
+		t.Fatalf("unauthenticated runtime response leaked password: %s", unauthRuntime.Body.String())
+	}
+
+	runtimeReq := httptest.NewRequest(http.MethodGet, "/api/v1/system/runtime", nil)
+	runtimeReq.Header.Set("Authorization", "Bearer "+session.Token)
+	runtimeRes := httptest.NewRecorder()
+	server.ServeHTTP(runtimeRes, runtimeReq)
+	if runtimeRes.Code != http.StatusOK {
+		t.Fatalf("runtime info status=%d body=%s", runtimeRes.Code, runtimeRes.Body.String())
+	}
+	if strings.Contains(runtimeRes.Body.String(), secret) || strings.Contains(runtimeRes.Body.String(), session.Token) {
+		t.Fatalf("runtime response leaked credential: %s", runtimeRes.Body.String())
+	}
+	var runtimeInfo RuntimeInfo
+	if err := json.Unmarshal(runtimeRes.Body.Bytes(), &runtimeInfo); err != nil {
+		t.Fatalf("decode runtime response: %v", err)
+	}
+	if runtimeInfo.OS == "" || runtimeInfo.Arch == "" || runtimeInfo.GoVersion == "" || runtimeInfo.TenantID != "tenant-a" || !runtimeInfo.StartedAt.Equal(now) {
+		t.Fatalf("runtime response missing safe fields: %+v", runtimeInfo)
+	}
+}
+
+func TestHTTPPasswordLoginAllowsSameOriginPublicHost(t *testing.T) {
+	cp := New(nil)
+	if err := cp.ConfigurePasswordLogin(PasswordLoginConfig{
+		Username: "admin",
+		Password: "public host login password",
+		TenantID: "tenant-a",
+		Role:     RoleAdmin,
+	}); err != nil {
+		t.Fatalf("configure password login: %v", err)
+	}
+	server := NewHTTPHandler(cp)
+
+	body := `{"username":"admin","password":"public host login password"}`
+	sameOrigin := httptest.NewRequest(http.MethodPost, "http://panel.example:8080/api/v1/auth/login", strings.NewReader(body))
+	sameOrigin.Header.Set("Origin", "http://panel.example:8080")
+	sameOrigin.Header.Set("Content-Type", "application/json")
+	sameOriginRes := httptest.NewRecorder()
+	server.ServeHTTP(sameOriginRes, sameOrigin)
+	if sameOriginRes.Code != http.StatusOK {
+		t.Fatalf("same-origin login status=%d body=%s", sameOriginRes.Code, sameOriginRes.Body.String())
+	}
+
+	crossOrigin := httptest.NewRequest(http.MethodPost, "http://panel.example:8080/api/v1/auth/login", strings.NewReader(body))
+	crossOrigin.Header.Set("Origin", "http://evil.example")
+	crossOrigin.Header.Set("Content-Type", "application/json")
+	crossOriginRes := httptest.NewRecorder()
+	server.ServeHTTP(crossOriginRes, crossOrigin)
+	if crossOriginRes.Code != http.StatusForbidden {
+		t.Fatalf("cross-origin login status=%d body=%s", crossOriginRes.Code, crossOriginRes.Body.String())
+	}
+}
+
 func TestHTTPSubscriptionEndpointDoesNotExposeOtherTokens(t *testing.T) {
 	now := time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC)
 	cp := New(func() time.Time { return now })
@@ -86,6 +182,48 @@ func TestHTTPSubscriptionEndpointDoesNotExposeOtherTokens(t *testing.T) {
 	}
 	if bytes.Contains(res.Body.Bytes(), []byte(token)) {
 		t.Fatal("subscription response leaked token")
+	}
+}
+
+func TestDefaultSubscriptionSeedIsUsableAndRedacted(t *testing.T) {
+	now := time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC)
+	cp := New(func() time.Time { return now })
+	token := "abcdefghijklmnopqrstuvwxyz0123456789"
+	sub, err := cp.ConfigureDefaultSubscription(DefaultSubscriptionConfig{
+		Token:          token,
+		UserID:         "admin",
+		TenantID:       "tenant-a",
+		ClientType:     "sing-box",
+		DeviceID:       "default",
+		Region:         "auto",
+		Protocol:       "vless",
+		OutboundPolicy: "proxy-default",
+	})
+	if err != nil {
+		t.Fatalf("configure default subscription: %v", err)
+	}
+	if sub.TokenHash != "" {
+		t.Fatalf("default subscription seed returned token hash: %+v", sub)
+	}
+	subs, err := cp.ListSubscriptions(adminCtx("tenant-a"), "tenant-a")
+	if err != nil {
+		t.Fatalf("list default subscriptions: %v", err)
+	}
+	if len(subs) != 1 || subs[0].TokenHash != "" || subs[0].UserID != "admin" || subs[0].ClientType != "sing-box" {
+		t.Fatalf("default subscription not listed safely: %+v", subs)
+	}
+	rendered, err := cp.RenderSubscription(token, "sing-box", "198.51.100.10")
+	if err != nil {
+		t.Fatalf("render default subscription: %v", err)
+	}
+	if strings.Contains(rendered, token) || strings.Contains(rendered, HashToken(token)) {
+		t.Fatalf("rendered subscription leaked token material: %s", rendered)
+	}
+	if !strings.Contains(rendered, "scholar.google.com") || !strings.Contains(rendered, "geoip-cn") || !strings.Contains(rendered, "geosite-cn") {
+		t.Fatalf("rendered subscription missing expected safe rules: %s", rendered)
+	}
+	if _, err := cp.ConfigureDefaultSubscription(DefaultSubscriptionConfig{Token: "short", TenantID: "tenant-a"}); !errors.Is(err, ErrBadRequest) {
+		t.Fatalf("unsafe default token err=%v, want ErrBadRequest", err)
 	}
 }
 

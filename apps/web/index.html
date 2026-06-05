@@ -1,163 +1,167 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>sing-box-next-panel</title>
+  <title>MI Proxy 运维面板</title>
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-  <aside class="nav" aria-label="Primary">
-    <div class="brand"><span class="mark"></span><span>Sing-Box Pro</span><small>Operations</small></div>
-    <a href="#overview">Overview</a>
-    <a href="#nodes">Nodes</a>
-    <a href="#routes">Routes &amp; Rules</a>
-    <a href="#subscriptions">Subscriptions</a>
-    <a href="#warp">WARP Pool</a>
-    <a href="#protocols">Protocols</a>
-    <a href="#traffic">Traffic</a>
-    <a href="#observability">Observability</a>
-    <a href="#security">Security</a>
-    <a href="#deployments">Deployments</a>
-    <a href="#incidents">Incidents</a>
-    <a href="#settings">Settings</a>
+  <aside class="nav" aria-label="主导航">
+    <div class="brand"><span class="mark"></span><span>MI Proxy</span><small>运维面板</small></div>
+    <a href="#overview">总览</a>
+    <a href="#nodes">节点</a>
+    <a href="#routes">规则与路由</a>
+    <a href="#subscriptions">订阅</a>
+    <a href="#warp">WARP 池</a>
+    <a href="#protocols">协议</a>
+    <a href="#traffic">流量</a>
+    <a href="#observability">可观测</a>
+    <a href="#security">安全</a>
+    <a href="#deployments">部署</a>
+    <a href="#incidents">事件</a>
+    <a href="#settings">设置</a>
   </aside>
 
   <main>
     <header class="topbar">
       <div>
-        <div class="crumb">Operations Dashboard</div>
-        <small id="lastUpdated">Waiting for live API data</small>
+        <div class="crumb">运维面板</div>
+        <small id="lastUpdated">等待登录后加载数据</small>
       </div>
-      <div id="connectionPill" class="pill warn">Disconnected</div>
-      <label class="search"><span>Search</span><input id="searchInput" autocomplete="off" placeholder="node / region / domain / IP"></label>
-      <button id="refreshButton" type="button" title="Refresh data">Refresh</button>
-      <button id="disconnectButton" type="button" title="Clear session">Disconnect</button>
+      <div id="connectionPill" class="pill warn">未连接</div>
+      <label class="search"><span>搜索</span><input id="searchInput" autocomplete="off" placeholder="节点 / 地区 / 域名 / IP"></label>
+      <button id="refreshButton" type="button" title="刷新数据">刷新</button>
+      <button id="disconnectButton" type="button" title="退出登录">退出</button>
     </header>
 
     <section id="session" class="band compact">
       <header class="toolbar">
-        <h1>API Session</h1>
-        <div id="sessionStatus" class="status warn">Credentials required</div>
+        <h1>账号登录</h1>
+        <div id="sessionStatus" class="status warn">需要登录</div>
       </header>
       <form id="sessionForm" class="session-grid" autocomplete="off">
-        <label>API base URL<input id="apiBaseInput" name="apiBase" placeholder="/"></label>
-        <label>Auth mode<select id="authModeInput" name="authMode"><option value="bearer">Bearer token</option><option value="gateway">Trusted gateway headers</option></select></label>
-        <label class="auth-field auth-bearer">API token<input id="apiTokenInput" name="apiToken" type="password" autocomplete="off"></label>
-        <label class="auth-field auth-gateway">User ID<input id="userIdInput" name="userId" autocomplete="off"></label>
-        <label class="auth-field auth-gateway">Tenant ID<input id="tenantIdInput" name="tenantId" autocomplete="off"></label>
-        <label class="auth-field auth-gateway">Role<select id="roleInput" name="role"><option value="admin">admin</option><option value="operator">operator</option><option value="viewer">viewer</option></select></label>
-        <label class="auth-field auth-gateway">CSRF token<input id="csrfInput" name="csrfToken" autocomplete="off"></label>
-        <label class="auth-field auth-gateway">Confirmation token<input id="confirmInput" name="confirmationToken" autocomplete="off"></label>
-        <button type="submit">Connect</button>
+        <label>面板地址<input id="apiBaseInput" name="apiBase" placeholder="/"></label>
+        <label>用户名<input id="usernameInput" name="username" autocomplete="username" placeholder="admin"></label>
+        <label>密码<input id="passwordInput" name="password" type="password" autocomplete="current-password"></label>
+        <button type="submit">登录</button>
       </form>
     </section>
 
     <section id="overview" class="band">
-      <header class="toolbar"><h1>Overview</h1><div id="healthStatus" class="status">Unknown</div></header>
+      <header class="toolbar"><h1>总览</h1><div id="healthStatus" class="status">未知</div></header>
       <div id="metricGrid" class="metric-grid"></div>
       <div class="overview-grid">
         <section class="panel topology">
-          <header class="panel-head"><h2>Global Traffic Topology</h2><span id="mapSummary"></span></header>
-          <div id="trafficMap" class="world-map" aria-label="Live node topology map"></div>
+          <header class="panel-head"><h2>全局流量拓扑</h2><span id="mapSummary"></span></header>
+          <div id="trafficMap" class="world-map" aria-label="节点拓扑图"></div>
         </section>
-        <section class="panel trend"><h2>Traffic Trend</h2><canvas id="trafficTrendChart"></canvas></section>
-        <section class="panel resources"><h2>System Resources</h2><div id="resourceRings" class="rings"></div><canvas id="resourceChart"></canvas></section>
-        <section class="panel warp-mini"><h2>WARP Exit Health</h2><div class="table-wrap"><table><thead><tr><th>Profile</th><th>Status</th><th>Latency</th><th>Loss</th></tr></thead><tbody id="exitQualityBody"></tbody></table></div></section>
+        <section class="panel trend"><h2>流量趋势</h2><canvas id="trafficTrendChart"></canvas></section>
+        <section class="panel resources"><h2>系统资源</h2><div id="resourceRings" class="rings"></div><canvas id="resourceChart"></canvas></section>
+        <section class="panel warp-mini"><h2>WARP 出口健康</h2><div class="table-wrap"><table><thead><tr><th>配置</th><th>状态</th><th>延迟</th><th>丢包</th></tr></thead><tbody id="exitQualityBody"></tbody></table></div></section>
       </div>
-      <div class="split">
-        <section class="panel"><h2>Capacity Plan</h2><div id="capacityPlan" class="stack"></div></section>
-        <section class="panel"><h2>Dependency Health</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>State</th><th>Message</th></tr></thead><tbody id="dependencyBody"></tbody></table></div></section>
+      <div class="split overview-details">
+        <section class="panel"><h2>容量计划</h2><div id="capacityPlan" class="stack"></div></section>
+        <section class="panel"><h2>依赖健康</h2><div class="table-wrap"><table><thead><tr><th>名称</th><th>状态</th><th>信息</th></tr></thead><tbody id="dependencyBody"></tbody></table></div></section>
+        <section class="panel"><h2>VPS 信息</h2><div id="runtimeInfo" class="stack"></div></section>
       </div>
     </section>
 
     <section id="nodes" class="band">
-      <h1>Nodes</h1>
+      <h1>节点</h1>
       <div class="split">
-        <section class="panel"><h2>Region Distribution</h2><canvas id="regionChart"></canvas></section>
-        <section class="panel"><h2>Resource Timeline</h2><canvas id="nodeResourceChart"></canvas></section>
+        <section class="panel"><h2>地区分布</h2><canvas id="regionChart"></canvas></section>
+        <section class="panel"><h2>资源时间线</h2><canvas id="nodeResourceChart"></canvas></section>
       </div>
-      <h2>Node Fleet</h2>
-      <div class="table-wrap"><table><thead><tr><th>Node</th><th>Region</th><th>Status</th><th>sing-box</th><th>Connections</th><th>CPU</th><th>Memory</th><th>Kernel</th><th>Ports</th></tr></thead><tbody id="nodeBody"></tbody></table></div>
-      <section class="panel"><h2>Kernel Tuning</h2><div class="table-wrap"><table><thead><tr><th>Node</th><th>Region</th><th>BBR</th><th>qdisc</th><th>FD</th><th>Issues</th></tr></thead><tbody id="kernelBody"></tbody></table></div></section>
+      <h2>节点列表</h2>
+      <div class="table-wrap"><table><thead><tr><th>节点</th><th>地区</th><th>状态</th><th>sing-box</th><th>连接数</th><th>CPU</th><th>内存</th><th>内核</th><th>端口</th></tr></thead><tbody id="nodeBody"></tbody></table></div>
+      <section class="panel"><h2>内核调优</h2><div class="table-wrap"><table><thead><tr><th>节点</th><th>地区</th><th>BBR</th><th>qdisc</th><th>FD</th><th>问题</th></tr></thead><tbody id="kernelBody"></tbody></table></div></section>
     </section>
 
     <section id="routes" class="band">
-      <h1>Routes &amp; Rules</h1>
+      <h1>规则与路由</h1>
       <div class="split">
-        <section class="panel"><h2>Outbound Mix</h2><canvas id="routeMixChart"></canvas></section>
-        <section class="panel"><h2>Rule Sources</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Source</th><th>Checksum</th></tr></thead><tbody id="ruleSourceBody"></tbody></table></div></section>
+        <section class="panel"><h2>出口占比</h2><canvas id="routeMixChart"></canvas></section>
+        <section class="panel"><h2>规则源</h2><div class="table-wrap"><table><thead><tr><th>名称</th><th>来源</th><th>校验和</th></tr></thead><tbody id="ruleSourceBody"></tbody></table></div></section>
       </div>
       <form id="routeProbeForm" class="tool-row" autocomplete="off">
-        <input id="domainInput" aria-label="Domain or IP" placeholder="domain or IP">
-        <select id="protocolInput" aria-label="Protocol"><option value="">any protocol</option><option value="vless">vless</option><option value="tuic">tuic</option><option value="hysteria2">hysteria2</option><option value="trojan">trojan</option></select>
-        <button type="submit" title="Test route">Test</button>
-        <output id="domainResult">No route test yet</output>
+        <input id="domainInput" aria-label="域名或 IP" placeholder="域名或 IP">
+        <select id="protocolInput" aria-label="协议"><option value="">任意协议</option><option value="vless">vless</option><option value="tuic">tuic</option><option value="hysteria2">hysteria2</option><option value="trojan">trojan</option></select>
+        <button type="submit" title="测试路由">测试</button>
+        <output id="domainResult">尚未测试</output>
       </form>
-      <h2>Route Decision Audit</h2>
-      <div class="table-wrap"><table><thead><tr><th>Input</th><th>Protocol</th><th>Node</th><th>Outbound</th><th>Rule ID</th><th>Matched source</th><th>Why</th></tr></thead><tbody id="routeTraceBody"></tbody></table></div>
-      <section class="panel"><h2>Active Rules</h2><div class="table-wrap"><table><thead><tr><th>Rule</th><th>Type</th><th>Outbound</th><th>Source</th></tr></thead><tbody id="ruleBody"></tbody></table></div></section>
+      <h2>路由决策审计</h2>
+      <div class="table-wrap"><table><thead><tr><th>输入</th><th>协议</th><th>节点</th><th>出口</th><th>规则 ID</th><th>匹配源</th><th>原因</th></tr></thead><tbody id="routeTraceBody"></tbody></table></div>
+      <section class="panel"><h2>生效规则</h2><div class="table-wrap"><table><thead><tr><th>规则</th><th>类型</th><th>出口</th><th>来源</th></tr></thead><tbody id="ruleBody"></tbody></table></div></section>
     </section>
 
     <section id="subscriptions" class="band">
-      <h1>Subscriptions</h1>
+      <h1>订阅</h1>
       <div id="subscriptionMetrics" class="metric-grid"></div>
-      <div class="table-wrap"><table><thead><tr><th>User</th><th>Device</th><th>Region</th><th>Protocol</th><th>Outbound policy</th><th>Client</th><th>Token kind</th><th>Status</th></tr></thead><tbody id="subscriptionBody"></tbody></table></div>
-      <section class="panel"><h2>Conversions</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Source client</th><th>Target client</th><th>Region</th><th>Protocol</th><th>Status</th></tr></thead><tbody id="conversionBody"></tbody></table></div></section>
+      <form id="subscriptionForm" class="tool-row subscription-form" autocomplete="off">
+        <input id="subUserInput" aria-label="用户" placeholder="用户">
+        <input id="subDeviceInput" aria-label="设备" placeholder="设备">
+        <select id="subClientInput" aria-label="客户端"><option value="sing-box">sing-box</option><option value="clash-meta">clash-meta</option><option value="shadowrocket">shadowrocket</option><option value="v2rayn">v2rayn</option><option value="nekobox">nekobox</option></select>
+        <select id="subProtocolInput" aria-label="协议"><option value="vless">vless</option><option value="tuic">tuic</option><option value="hysteria2">hysteria2</option><option value="trojan">trojan</option></select>
+        <button type="submit">创建订阅</button>
+        <output id="subscriptionResult">token 不在面板显示</output>
+      </form>
+      <div class="table-wrap"><table><thead><tr><th>用户</th><th>设备</th><th>地区</th><th>协议</th><th>出口策略</th><th>客户端</th><th>令牌类型</th><th>状态</th></tr></thead><tbody id="subscriptionBody"></tbody></table></div>
+      <section class="panel"><h2>订阅转换</h2><div class="table-wrap"><table><thead><tr><th>名称</th><th>源客户端</th><th>目标客户端</th><th>地区</th><th>协议</th><th>状态</th></tr></thead><tbody id="conversionBody"></tbody></table></div></section>
     </section>
 
     <section id="warp" class="band">
-      <h1>WARP Pool</h1>
-      <div class="table-wrap"><table><thead><tr><th>Profile</th><th>Health</th><th>Node</th><th>Exit IP</th><th>ASN</th><th>DNS</th><th>WireGuard</th><th>Latency</th><th>Loss</th><th>HTTP</th></tr></thead><tbody id="warpBody"></tbody></table></div>
+      <h1>WARP 池</h1>
+      <div class="table-wrap"><table><thead><tr><th>配置</th><th>健康</th><th>节点</th><th>出口 IP</th><th>ASN</th><th>DNS</th><th>WireGuard</th><th>延迟</th><th>丢包</th><th>HTTP</th></tr></thead><tbody id="warpBody"></tbody></table></div>
       <div class="split">
-        <section class="panel"><h2>Site Scheduling</h2><canvas id="warpScheduleChart"></canvas></section>
-        <section class="panel"><h2>Scholar WARP Guard</h2><div id="scholarGuard" class="status">Not checked</div></section>
+        <section class="panel"><h2>站点调度</h2><canvas id="warpScheduleChart"></canvas></section>
+        <section class="panel"><h2>Google Scholar 防 WARP</h2><div id="scholarGuard" class="status">未检查</div></section>
       </div>
     </section>
 
     <section id="protocols" class="band">
-      <h1>Protocols</h1>
+      <h1>协议</h1>
       <div id="protocolGrid" class="metric-grid"></div>
     </section>
 
     <section id="traffic" class="band">
-      <h1>Traffic</h1>
+      <h1>流量</h1>
       <canvas id="trafficWideChart" class="wide-chart"></canvas>
-      <h2>Recent Flow Decisions</h2>
-      <div class="table-wrap"><table><thead><tr><th>Input</th><th>Protocol</th><th>Node</th><th>Outbound</th><th>Why</th></tr></thead><tbody id="recentFlowBody"></tbody></table></div>
+      <h2>最近流量决策</h2>
+      <div class="table-wrap"><table><thead><tr><th>输入</th><th>协议</th><th>节点</th><th>出口</th><th>原因</th></tr></thead><tbody id="recentFlowBody"></tbody></table></div>
     </section>
 
     <section id="observability" class="band">
-      <h1>Observability</h1>
+      <h1>可观测</h1>
       <div class="split">
-        <section class="panel"><h2>Logs Query</h2><pre id="logOutput"></pre></section>
-        <section class="panel"><h2>Audit Logs</h2><div class="table-wrap"><table><thead><tr><th>Action</th><th>Resource</th><th>Actor</th><th>At</th></tr></thead><tbody id="auditBody"></tbody></table></div></section>
+        <section class="panel"><h2>日志</h2><pre id="logOutput"></pre></section>
+        <section class="panel"><h2>审计日志</h2><div class="table-wrap"><table><thead><tr><th>动作</th><th>资源</th><th>操作者</th><th>时间</th></tr></thead><tbody id="auditBody"></tbody></table></div></section>
       </div>
     </section>
 
     <section id="security" class="band">
-      <h1>Security</h1>
+      <h1>安全</h1>
       <div class="split">
-        <section class="panel"><h2>Security Waivers</h2><div class="table-wrap"><table><thead><tr><th>Gate</th><th>Severity</th><th>Owner</th><th>Expires</th><th>Remediation</th></tr></thead><tbody id="waiverBody"></tbody></table></div></section>
-        <section class="panel"><h2>API Availability</h2><div id="availabilityBody" class="stack"></div></section>
+        <section class="panel"><h2>安全豁免</h2><div class="table-wrap"><table><thead><tr><th>关卡</th><th>级别</th><th>负责人</th><th>过期</th><th>修复计划</th></tr></thead><tbody id="waiverBody"></tbody></table></div></section>
+        <section class="panel"><h2>API 可用性</h2><div id="availabilityBody" class="stack"></div></section>
       </div>
     </section>
 
     <section id="deployments" class="band">
-      <h1>Deployments</h1>
-      <div class="table-wrap"><table><thead><tr><th>Node</th><th>Config version</th><th>Status</th><th>Last seen</th></tr></thead><tbody id="deploymentBody"></tbody></table></div>
-      <section class="panel"><h2>Argo Tunnels</h2><div class="table-wrap"><table><thead><tr><th>Name</th><th>Hostname</th><th>Service</th><th>Status</th></tr></thead><tbody id="argoBody"></tbody></table></div></section>
+      <h1>部署</h1>
+      <div class="table-wrap"><table><thead><tr><th>节点</th><th>配置版本</th><th>状态</th><th>最后在线</th></tr></thead><tbody id="deploymentBody"></tbody></table></div>
+      <section class="panel"><h2>Argo 隧道</h2><div class="table-wrap"><table><thead><tr><th>名称</th><th>主机名</th><th>服务</th><th>状态</th></tr></thead><tbody id="argoBody"></tbody></table></div></section>
     </section>
 
     <section id="incidents" class="band">
-      <h1>Incidents</h1>
-      <div class="table-wrap"><table><thead><tr><th>Severity</th><th>Status</th><th>Title</th><th>Started</th></tr></thead><tbody id="incidentBody"></tbody></table></div>
-      <section class="panel"><h2>Runbooks</h2><div class="table-wrap"><table><thead><tr><th>Severity</th><th>Target</th><th>Runbooks</th><th>Primary mitigation</th></tr></thead><tbody id="runbookBody"></tbody></table></div></section>
+      <h1>事件</h1>
+      <div class="table-wrap"><table><thead><tr><th>级别</th><th>状态</th><th>标题</th><th>开始时间</th></tr></thead><tbody id="incidentBody"></tbody></table></div>
+      <section class="panel"><h2>预案</h2><div class="table-wrap"><table><thead><tr><th>级别</th><th>目标</th><th>预案</th><th>主要缓解</th></tr></thead><tbody id="runbookBody"></tbody></table></div></section>
     </section>
 
     <section id="settings" class="band">
-      <h1>Settings</h1>
-      <div class="table-wrap"><table><thead><tr><th>Control</th><th>Value</th></tr></thead><tbody id="settingsBody"></tbody></table></div>
+      <h1>设置</h1>
+      <div class="table-wrap"><table><thead><tr><th>项目</th><th>值</th></tr></thead><tbody id="settingsBody"></tbody></table></div>
     </section>
   </main>
   <script src="./app.js"></script>

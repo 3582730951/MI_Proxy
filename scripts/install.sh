@@ -275,10 +275,40 @@ write_passwd_file() {
   mkdir -p "$parent"
   current_secret=$(read_password_value POSTGRES_PASSWORD "${POSTGRES_PASSWORD:-}")
   [ -n "$current_secret" ] || current_secret=$(generate_secret)
+  current_admin_user=$(read_password_value MI_PANEL_ADMIN_USER "${MI_PANEL_ADMIN_USER:-admin}")
+  [ -n "$current_admin_user" ] || current_admin_user=admin
+  current_admin_tenant=$(read_password_value MI_PANEL_ADMIN_TENANT "${MI_PANEL_ADMIN_TENANT:-tenant-a}")
+  [ -n "$current_admin_tenant" ] || current_admin_tenant=tenant-a
+  current_admin_password=$(read_password_value MI_PANEL_ADMIN_PASSWORD "${MI_PANEL_ADMIN_PASSWORD:-}")
+  [ -n "$current_admin_password" ] || current_admin_password=$(generate_secret)
+  current_sub_token=$(read_password_value MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN "${MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN:-}")
+  [ -n "$current_sub_token" ] || current_sub_token=$(generate_secret)
+  current_sub_user=$(read_password_value MI_PANEL_DEFAULT_SUBSCRIPTION_USER "${MI_PANEL_DEFAULT_SUBSCRIPTION_USER:-$current_admin_user}")
+  [ -n "$current_sub_user" ] || current_sub_user=$current_admin_user
+  current_sub_client=$(read_password_value MI_PANEL_DEFAULT_SUBSCRIPTION_CLIENT "${MI_PANEL_DEFAULT_SUBSCRIPTION_CLIENT:-sing-box}")
+  [ -n "$current_sub_client" ] || current_sub_client=sing-box
+  current_sub_device=$(read_password_value MI_PANEL_DEFAULT_SUBSCRIPTION_DEVICE "${MI_PANEL_DEFAULT_SUBSCRIPTION_DEVICE:-default}")
+  [ -n "$current_sub_device" ] || current_sub_device=default
+  current_sub_region=$(read_password_value MI_PANEL_DEFAULT_SUBSCRIPTION_REGION "${MI_PANEL_DEFAULT_SUBSCRIPTION_REGION:-auto}")
+  [ -n "$current_sub_region" ] || current_sub_region=auto
+  current_sub_protocol=$(read_password_value MI_PANEL_DEFAULT_SUBSCRIPTION_PROTOCOL "${MI_PANEL_DEFAULT_SUBSCRIPTION_PROTOCOL:-vless}")
+  [ -n "$current_sub_protocol" ] || current_sub_protocol=vless
+  current_sub_outbound=$(read_password_value MI_PANEL_DEFAULT_SUBSCRIPTION_OUTBOUND "${MI_PANEL_DEFAULT_SUBSCRIPTION_OUTBOUND:-proxy-default}")
+  [ -n "$current_sub_outbound" ] || current_sub_outbound=proxy-default
   tmp="$PASSWD_FILE.tmp.$$"
   umask 077
   {
     printf 'POSTGRES_PASSWORD=%s\n' "$current_secret"
+    printf 'MI_PANEL_ADMIN_USER=%s\n' "$current_admin_user"
+    printf 'MI_PANEL_ADMIN_PASSWORD=%s\n' "$current_admin_password"
+    printf 'MI_PANEL_ADMIN_TENANT=%s\n' "$current_admin_tenant"
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN=%s\n' "$current_sub_token"
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_USER=%s\n' "$current_sub_user"
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_CLIENT=%s\n' "$current_sub_client"
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_DEVICE=%s\n' "$current_sub_device"
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_REGION=%s\n' "$current_sub_region"
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_PROTOCOL=%s\n' "$current_sub_protocol"
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_OUTBOUND=%s\n' "$current_sub_outbound"
   } > "$tmp"
   mv "$tmp" "$PASSWD_FILE"
   chmod 600 "$PASSWD_FILE"

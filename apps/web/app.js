@@ -1,5 +1,5 @@
 const palette = ["#3fbf9f", "#e0a33a", "#6f8cff", "#d85d7c", "#7fcf5f", "#9f80ff"];
-const emptyText = "No data returned by API";
+const emptyText = "API 暂无数据";
 const state = {
   session: null,
   data: {},
@@ -12,6 +12,7 @@ const endpoints = {
   overview: "/api/v1/metrics/overview",
   capacity: "/api/v1/metrics/capacity",
   dependencies: "/api/v1/metrics/dependencies",
+  runtime: "/api/v1/system/runtime",
   nodes: "/api/v1/nodes",
   kernel: "/api/v1/nodes/kernel-tuning",
   rules: "/api/v1/rules",
@@ -78,7 +79,7 @@ function percent(value) {
 
 function compactNumber(value) {
   const n = number(value);
-  return new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  return new Intl.NumberFormat("zh-CN", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 }
 
 function bytes(value) {
@@ -126,16 +127,16 @@ function filterRows(rows) {
   return normalizeRows(rows).filter(rowMatchesSearch);
 }
 
-function renderEmpty(tbody, colspan) {
-  tbody.innerHTML = `<tr class="empty"><td colspan="${colspan}">${emptyText}</td></tr>`;
+function renderEmpty(tbody, colspan, message = emptyText) {
+  tbody.innerHTML = `<tr class="empty"><td colspan="${colspan}">${message}</td></tr>`;
 }
 
-function renderRows(tbodyId, rows, colspan, renderRow) {
+function renderRows(tbodyId, rows, colspan, renderRow, emptyMessage = emptyText) {
   const tbody = byId(tbodyId);
   if (!tbody) return;
   const filtered = filterRows(rows);
   if (!filtered.length) {
-    renderEmpty(tbody, colspan);
+    renderEmpty(tbody, colspan, emptyMessage);
     return;
   }
   tbody.replaceChildren(...filtered.map(renderRow));
@@ -180,26 +181,42 @@ function clearSession() {
   renderAll();
 }
 
+function normalizeAPIBase(value) {
+  const base = String(value || "").trim();
+  if (!base || base === "/") return "";
+  return base.replace(/\/+$/, "");
+}
+
 function apiBase() {
-  const base = text(valueOf(state.session, "apiBase"), "").trim();
-  return base === "/" ? "" : base.replace(/\/$/, "");
+  return normalizeAPIBase(valueOf(state.session, "apiBase"));
 }
 
 function authHeaders(method = "GET") {
   const headers = { Accept: "application/json" };
   const session = state.session || {};
-  if (session.authMode === "bearer" && session.apiToken) {
+  if (session.apiToken) {
     headers.Authorization = `Bearer ${session.apiToken}`;
-  }
-  if (session.authMode === "gateway") {
-    if (session.userId) headers["X-User-ID"] = session.userId;
-    if (session.tenantId) headers["X-Tenant-ID"] = session.tenantId;
-    if (session.role) headers["X-Role"] = session.role;
-    if (session.csrfToken) headers["X-CSRF-Token"] = session.csrfToken;
-    if (session.confirmationToken) headers["X-Confirm-Token"] = session.confirmationToken;
   }
   if (method !== "GET") headers["Content-Type"] = "application/json";
   return headers;
+}
+
+async function loginFetch(base, username, password) {
+  const res = await fetch(`${normalizeAPIBase(base)}/api/v1/auth/login`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ username, password }),
+  });
+  const contentType = res.headers.get("Content-Type") || "";
+  const body = contentType.includes("application/json") ? await res.json() : await res.text();
+  if (!res.ok) {
+    const message = typeof body === "string" ? body.trim() : valueOf(body, "error", "message");
+    throw new Error(message || `${res.status} ${res.statusText}`);
+  }
+  return body;
 }
 
 async function apiFetch(path, options = {}) {
@@ -220,10 +237,14 @@ async function apiFetch(path, options = {}) {
 
 async function refreshData() {
   if (!state.session) {
-    setConnection("Disconnected", "warn");
+    state.failures = [];
+    state.data = {};
+    setConnection("未连接", "warn");
+    byId("lastUpdated").textContent = "等待登录后加载数据";
+    renderAll();
     return;
   }
-  setConnection("Loading", "warn");
+  setConnection("加载中", "warn");
   state.failures = [];
   state.data = {};
   const entries = Object.entries(endpoints);
@@ -241,8 +262,8 @@ async function refreshData() {
   await loadNodeMetricSamples();
   await loadScholarGuard();
   const connected = successCount > 0;
-  setConnection(connected ? "Live" : "Error", connected ? "ok" : "bad");
-  byId("lastUpdated").textContent = connected ? `Updated ${new Date().toLocaleString()}` : "No API data loaded";
+  setConnection(connected ? "在线" : "错误", connected ? "ok" : "bad");
+  byId("lastUpdated").textContent = connected ? `更新于 ${new Date().toLocaleString()}` : "未加载到 API 数据";
   renderAll();
 }
 
@@ -291,25 +312,25 @@ function renderMetrics() {
   const capacity = state.data.capacity || {};
   const metricGrid = byId("metricGrid");
   if (!metricGrid) return;
-  setStatus(byId("healthStatus"), text(valueOf(overview, "Health", "health"), "Unknown"), healthTone(valueOf(overview, "Health", "health")));
+  setStatus(byId("healthStatus"), text(valueOf(overview, "Health", "health"), "未知"), healthTone(valueOf(overview, "Health", "health")));
   const metrics = [
-    ["Online nodes", compactNumber(valueOf(overview, "OnlineNodes", "onlineNodes"))],
-    ["Offline nodes", compactNumber(valueOf(overview, "OfflineNodes", "offlineNodes"))],
-    ["Alerts", compactNumber(valueOf(overview, "Alerts", "alerts"))],
-    ["Total connections", compactNumber(valueOf(overview, "TotalConnections", "totalConnections"))],
-    ["Active connections", compactNumber(valueOf(overview, "ActiveConnections", "activeConnections"))],
-    ["New connection rate", `${compactNumber(valueOf(overview, "NewConnectionRate", "newConnectionRate"))}/s`],
-    ["Total traffic", bytes(valueOf(overview, "TotalTrafficBytes", "totalTrafficBytes"))],
-    ["Up / Down", `${bps(valueOf(overview, "UpBps", "upBps"))} / ${bps(valueOf(overview, "DownBps", "downBps"))}`],
-    ["CPU / memory", `${percent(valueOf(overview, "CPU", "cpu"))} / ${percent(valueOf(overview, "Memory", "memory"))}`],
-    ["Disk / FD", `${percent(valueOf(overview, "Disk", "disk"))} / ${percent(valueOf(overview, "FDUsage", "fdUsage"))}`],
-    ["Network PPS", compactNumber(valueOf(overview, "NetworkPPS", "networkPPS"))],
-    ["99p API latency", ms(valueOf(overview, "API99pMs", "api99pMs"))],
-    ["Subscription latency", ms(valueOf(overview, "Subscription99pMs", "subscription99pMs"))],
-    ["Config apply latency", ms(valueOf(overview, "ConfigApply99pMs", "configApply99pMs"))],
-    ["Capacity tier", text(valueOf(capacity, "Tier", "tier"))],
-    ["Autoscaling recommendation", `${compactNumber(valueOf(capacity, "RecommendedAPIReplicas", "recommendedAPIReplicas"))} API replicas`],
-    ["Cost guardrail", text((valueOf(capacity, "CostActions", "costActions") || [])[0])],
+    ["在线节点", compactNumber(valueOf(overview, "OnlineNodes", "onlineNodes"))],
+    ["离线节点", compactNumber(valueOf(overview, "OfflineNodes", "offlineNodes"))],
+    ["告警", compactNumber(valueOf(overview, "Alerts", "alerts"))],
+    ["总连接数", compactNumber(valueOf(overview, "TotalConnections", "totalConnections"))],
+    ["活跃连接", compactNumber(valueOf(overview, "ActiveConnections", "activeConnections"))],
+    ["新连接速率", `${compactNumber(valueOf(overview, "NewConnectionRate", "newConnectionRate"))}/s`],
+    ["总流量", bytes(valueOf(overview, "TotalTrafficBytes", "totalTrafficBytes"))],
+    ["上行 / 下行", `${bps(valueOf(overview, "UpBps", "upBps"))} / ${bps(valueOf(overview, "DownBps", "downBps"))}`],
+    ["CPU / 内存", `${percent(valueOf(overview, "CPU", "cpu"))} / ${percent(valueOf(overview, "Memory", "memory"))}`],
+    ["磁盘 / FD", `${percent(valueOf(overview, "Disk", "disk"))} / ${percent(valueOf(overview, "FDUsage", "fdUsage"))}`],
+    ["网络 PPS", compactNumber(valueOf(overview, "NetworkPPS", "networkPPS"))],
+    ["API 99p 延迟", ms(valueOf(overview, "API99pMs", "api99pMs"))],
+    ["订阅 99p 延迟", ms(valueOf(overview, "Subscription99pMs", "subscription99pMs"))],
+    ["配置应用 99p 延迟", ms(valueOf(overview, "ConfigApply99pMs", "configApply99pMs"))],
+    ["容量档位", text(valueOf(capacity, "Tier", "tier"))],
+    ["扩容建议", `${compactNumber(valueOf(capacity, "RecommendedAPIReplicas", "recommendedAPIReplicas"))} 个 API 副本`],
+    ["成本护栏", text((valueOf(capacity, "CostActions", "costActions") || [])[0])],
   ];
   metricGrid.replaceChildren(...metrics.map(([label, value], index) => metricCard(label, value, metricSeriesFor(label, index))));
 }
@@ -317,12 +338,12 @@ function renderMetrics() {
 function metricSeriesFor(label, index) {
   const samples = normalizeRows(state.data.nodeSamples);
   const fieldByLabel = {
-    "Total connections": ["Connections", "connections"],
-    "Active connections": ["Connections", "connections"],
-    "Up / Down": ["TxBps", "txBps"],
-    "CPU / memory": ["CPU", "cpu"],
-    "Disk / FD": ["Disk", "disk"],
-    "Network PPS": ["NetworkPPS", "networkPPS"],
+    "总连接数": ["Connections", "connections"],
+    "活跃连接": ["Connections", "connections"],
+    "上行 / 下行": ["TxBps", "txBps"],
+    "CPU / 内存": ["CPU", "cpu"],
+    "磁盘 / FD": ["Disk", "disk"],
+    "网络 PPS": ["NetworkPPS", "networkPPS"],
   };
   const fields = fieldByLabel[label];
   if (!fields || !samples.length) return [0];
@@ -344,12 +365,12 @@ function renderOverviewPanels() {
   });
   byId("capacityPlan").replaceChildren(
     ...[
-      ["Tier", valueOf(capacity, "Tier", "tier")],
-      ["Control plane mode", valueOf(capacity, "ControlPlaneMode", "controlPlaneMode")],
-      ["Target API RPS", compactNumber(valueOf(capacity, "TargetAPIRPS", "targetAPIRPS"))],
-      ["Target subscription RPS", compactNumber(valueOf(capacity, "TargetSubscriptionRPS", "targetSubscriptionRPS"))],
-      ["Actions", normalizeRows(valueOf(capacity, "AutoscalingActions", "autoscalingActions")).join("; ")],
-      ["Reasons", normalizeRows(valueOf(capacity, "Reasons", "reasons")).join("; ")],
+      ["档位", valueOf(capacity, "Tier", "tier")],
+      ["控制面模式", valueOf(capacity, "ControlPlaneMode", "controlPlaneMode")],
+      ["目标 API RPS", compactNumber(valueOf(capacity, "TargetAPIRPS", "targetAPIRPS"))],
+      ["目标订阅 RPS", compactNumber(valueOf(capacity, "TargetSubscriptionRPS", "targetSubscriptionRPS"))],
+      ["动作", normalizeRows(valueOf(capacity, "AutoscalingActions", "autoscalingActions")).join("; ")],
+      ["原因", normalizeRows(valueOf(capacity, "Reasons", "reasons")).join("; ")],
     ].map(([label, value]) => keyValue(label, value))
   );
   let deps = normalizeRows(valueOf(state.data.dependencies, "Dependencies", "dependencies"));
@@ -360,8 +381,40 @@ function renderOverviewPanels() {
     valueOf(row, "Message", "message"),
   ]));
   renderResourceRings();
+  renderRuntimeInfo();
   drawLine(byId("trafficTrendChart"), normalizeRows(state.data.nodeSamples).map(sample => number(valueOf(sample, "RxBps", "rxBps")) + number(valueOf(sample, "TxBps", "txBps"))));
   drawLine(byId("resourceChart"), normalizeRows(state.data.nodeSamples).map(sample => number(valueOf(sample, "CPU", "cpu"))));
+}
+
+function renderRuntimeInfo() {
+  const box = byId("runtimeInfo");
+  if (!box) return;
+  const info = state.data.runtime || {};
+  if (!valueOf(info, "startedAt", "StartedAt") && !valueOf(info, "os", "OS")) {
+    box.replaceChildren(keyValue("状态", emptyText));
+    return;
+  }
+  box.replaceChildren(
+    ...[
+      ["主机名", valueOf(info, "hostname", "Hostname")],
+      ["系统", [valueOf(info, "os", "OS"), valueOf(info, "arch", "Arch")].filter(Boolean).join("/")],
+      ["Go 版本", valueOf(info, "goVersion", "GoVersion")],
+      ["启动时间", timeAgo(valueOf(info, "startedAt", "StartedAt"))],
+      ["运行时长", duration(valueOf(info, "uptimeSeconds", "UptimeSeconds"))],
+      ["租户", valueOf(info, "tenantId", "TenantID")],
+      ["访问 IP", valueOf(info, "clientIp", "ClientIP")],
+    ].map(([label, value]) => keyValue(label, value))
+  );
+}
+
+function duration(value) {
+  const total = Math.max(0, Math.floor(number(value)));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (days > 0) return `${days} 天 ${hours} 小时`;
+  if (hours > 0) return `${hours} 小时 ${minutes} 分钟`;
+  return `${minutes} 分钟`;
 }
 
 function keyValue(label, value) {
@@ -401,7 +454,7 @@ function renderTrafficMap() {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 1000 520");
   svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Node topology by region");
+  svg.setAttribute("aria-label", "按地区展示节点拓扑");
   svg.innerHTML = `
     <path class="land" d="M116 162c68-74 184-68 250-18 44 33 92 24 148 13 80-15 145-10 205 39 45 37 97 35 157 26 28-4 48 18 36 43-24 48-100 45-150 65-68 28-97 86-182 72-80-13-106-72-167-77-78-6-104 83-190 62-51-13-82-50-105-92-22-41-48-88-2-133z"/>
     <path class="land secondary" d="M188 346c60-13 97 28 136 66 22 22 54 42 44 70-14 37-82 22-120-3-42-28-105-39-103-88 1-22 17-39 43-45z"/>
@@ -442,7 +495,7 @@ function renderTrafficMap() {
   });
   map.replaceChildren(svg);
   const summary = [...regionCounts.entries()].sort().map(([region, count]) => `${region} ${count}`).join(" · ");
-  byId("mapSummary").textContent = summary || "No node coordinates";
+  byId("mapSummary").textContent = summary || "暂无节点坐标";
 }
 
 function svgLine(a, b, klass) {
@@ -479,7 +532,7 @@ function renderNodes() {
     percent(valueOf(row, "Memory", "memory")),
     valueOf(row, "KernelVersion", "kernelVersion"),
     `${text(valueOf(row, "PortRangeStart", "portRangeStart"))}-${text(valueOf(row, "PortRangeEnd", "portRangeEnd"))}`,
-  ]));
+  ]), "暂无节点 Agent；当前 VPS 信息在总览中展示");
   renderRows("kernelBody", state.data.kernel, 6, row => tr([
     valueOf(row, "NodeID", "nodeId"),
     valueOf(row, "Region", "region"),
@@ -487,7 +540,7 @@ function renderNodes() {
     valueOf(row, "QueueDiscipline", "queueDiscipline"),
     valueOf(row, "NoFile", "noFile"),
     normalizeRows(valueOf(row, "Issues", "issues")).join(", "),
-  ]));
+  ]), "暂无节点内核数据；Agent 上线后自动显示");
   drawBars(byId("regionChart"), regionCounts());
   drawLine(byId("nodeResourceChart"), normalizeRows(state.data.nodeSamples).map(sample => number(valueOf(sample, "CPU", "cpu"))));
 }
@@ -551,10 +604,10 @@ async function handleRouteProbe(event) {
   if (!input) return;
   const protocol = byId("protocolInput").value;
   const out = byId("domainResult");
-  out.textContent = "Testing";
+  out.textContent = "测试中";
   try {
     let result;
-    if (state.session && state.session.authMode === "bearer") {
+    if (state.session && state.session.apiToken) {
       result = await apiFetch("/api/v1/routes/trace", {
         method: "POST",
         body: JSON.stringify({ input, protocol }),
@@ -576,9 +629,9 @@ function renderSubscriptions() {
   const subs = normalizeRows(state.data.subscriptions);
   const conversions = normalizeRows(state.data.conversions);
   byId("subscriptionMetrics").replaceChildren(
-    metricCard("Active subscriptions", compactNumber(subs.filter(row => !valueOf(row, "Revoked", "revoked")).length), [subs.length]),
-    metricCard("Conversions", compactNumber(conversions.length), [conversions.length]),
-    metricCard("Subscription p99", ms(valueOf(state.data.overview || {}, "Subscription99pMs", "subscription99pMs")), [number(valueOf(state.data.overview || {}, "Subscription99pMs", "subscription99pMs"))])
+    metricCard("有效订阅", compactNumber(subs.filter(row => !valueOf(row, "Revoked", "revoked")).length), [subs.length]),
+    metricCard("转换规则", compactNumber(conversions.length), [conversions.length]),
+    metricCard("订阅 99p", ms(valueOf(state.data.overview || {}, "Subscription99pMs", "subscription99pMs")), [number(valueOf(state.data.overview || {}, "Subscription99pMs", "subscription99pMs"))])
   );
   renderRows("subscriptionBody", subs, 8, row => tr([
     valueOf(row, "UserID", "userId"),
@@ -588,8 +641,8 @@ function renderSubscriptions() {
     valueOf(row, "OutboundPolicy", "outboundPolicy"),
     valueOf(row, "ClientType", "clientType"),
     valueOf(row, "TokenKind", "tokenKind"),
-    valueOf(row, "Revoked", "revoked") ? "revoked" : "active",
-  ]));
+    valueOf(row, "Revoked", "revoked") ? "已吊销" : "有效",
+  ]), "暂无订阅记录；安装脚本会生成默认订阅，token 只保存在 VPS 密码文件");
   renderRows("conversionBody", conversions, 6, row => tr([
     valueOf(row, "name", "Name"),
     valueOf(row, "sourceClientType", "SourceClientType"),
@@ -598,6 +651,35 @@ function renderSubscriptions() {
     valueOf(row, "protocol", "Protocol"),
     valueOf(row, "status", "Status"),
   ]));
+}
+
+async function handleSubscriptionCreate(event) {
+  event.preventDefault();
+  const out = byId("subscriptionResult");
+  if (!state.session || !state.session.apiToken) {
+    out.textContent = "请先登录";
+    return;
+  }
+  const payload = {
+    userId: byId("subUserInput").value.trim() || state.session.userId || "admin",
+    deviceId: byId("subDeviceInput").value.trim() || "default",
+    clientType: byId("subClientInput").value,
+    protocol: byId("subProtocolInput").value,
+    tokenKind: "long",
+    scope: "read",
+  };
+  out.textContent = "创建中";
+  try {
+    await apiFetch("/api/v1/subscriptions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    out.textContent = "已创建，token 不在面板显示";
+    state.data.subscriptions = await apiFetch(endpoints.subscriptions);
+    renderSubscriptions();
+  } catch (err) {
+    out.textContent = err.message;
+  }
 }
 
 function renderWarp() {
@@ -616,12 +698,12 @@ function renderWarp() {
       percent(valueOf(probe, "Loss", "loss")),
       valueOf(probe, "HTTPSuccess", "httpSuccess") ? "ok" : "failed",
     ]);
-  });
+  }, "暂无 WARP 配置；添加 WARP profile 后展示出口健康");
   drawBars(byId("warpScheduleChart"), statusCounts(profiles));
   const guard = state.data.scholarGuard || {};
   const outbound = valueOf(guard, "Outbound", "outbound");
   const ok = outbound && String(outbound).toLowerCase() !== "warp-pool" && !String(outbound).toLowerCase().includes("warp");
-  setStatus(byId("scholarGuard"), guard.error ? guard.error : outbound ? `${outbound} via ${text(valueOf(guard, "MatchedSource", "matchedSource"))}` : "Not checked", guard.error ? "bad" : ok ? "ok" : "warn");
+  setStatus(byId("scholarGuard"), guard.error ? guard.error : outbound ? `${outbound} via ${text(valueOf(guard, "MatchedSource", "matchedSource"))}` : "未检查", guard.error ? "bad" : ok ? "ok" : "warn");
 }
 
 function statusCounts(rows) {
@@ -645,7 +727,7 @@ function renderProtocols() {
       [connections, number(valueOf(row, "RxBps", "rxBps")), number(valueOf(row, "TxBps", "txBps")) + index]
     );
   }));
-  if (!stats.length) grid.appendChild(metricCard("Protocols", emptyText, [0]));
+  if (!stats.length) grid.appendChild(metricCard("协议", emptyText, [0]));
 }
 
 function renderTraffic() {
@@ -674,11 +756,11 @@ function renderSecurity() {
   const availability = state.data.dependencies || {};
   const body = byId("availabilityBody");
   body.replaceChildren(
-    keyValue("Status", valueOf(availability, "Status", "status")),
-    keyValue("Core APIs", valueOf(availability, "CoreAPIsAvailable", "coreAPIsAvailable") ? "available" : "unavailable"),
-    keyValue("Write APIs", valueOf(availability, "WriteAPIsAvailable", "writeAPIsAvailable") ? "available" : "unavailable"),
-    keyValue("Rate limit mode", valueOf(availability, "RateLimitMode", "rateLimitMode")),
-    keyValue("Messages", normalizeRows(valueOf(availability, "Messages", "messages")).join("; "))
+    keyValue("状态", valueOf(availability, "Status", "status")),
+    keyValue("核心 API", valueOf(availability, "CoreAPIsAvailable", "coreAPIsAvailable") ? "可用" : "不可用"),
+    keyValue("写入 API", valueOf(availability, "WriteAPIsAvailable", "writeAPIsAvailable") ? "可用" : "不可用"),
+    keyValue("限流模式", valueOf(availability, "RateLimitMode", "rateLimitMode")),
+    keyValue("信息", normalizeRows(valueOf(availability, "Messages", "messages")).join("; "))
   );
 }
 
@@ -714,13 +796,13 @@ function renderIncidents() {
 
 function renderSettings() {
   const session = state.session || {};
-  const failures = state.failures.length ? state.failures.join("; ") : "none";
+  const failures = state.failures.length ? state.failures.join("; ") : "无";
   renderRows("settingsBody", [
-    ["API base", apiBase() || location.origin],
-    ["Auth mode", session.authMode],
-    ["Tenant", session.tenantId || "token scoped"],
-    ["Loaded endpoints", Object.keys(state.data).length],
-    ["Endpoint failures", failures],
+    ["面板地址", apiBase() || location.origin],
+    ["认证方式", session.authMode === "password" ? "账号密码" : "未登录"],
+    ["租户", session.tenantId || "未登录"],
+    ["已加载接口", Object.keys(state.data).length],
+    ["接口失败", failures],
   ], 2, row => tr(row));
 }
 
@@ -816,7 +898,7 @@ function renderAll() {
   const hasSession = Boolean(state.session);
   document.body.classList.toggle("needs-session", !hasSession);
   fillSessionForm();
-  setStatus(byId("sessionStatus"), hasSession ? "Credentials loaded" : "Credentials required", hasSession ? "ok" : "warn");
+  setStatus(byId("sessionStatus"), hasSession ? "已登录" : "需要登录", hasSession ? "ok" : "warn");
   renderMetrics();
   renderOverviewPanels();
   renderNodes();
@@ -835,39 +917,53 @@ function renderAll() {
 function fillSessionForm() {
   const session = state.session || {};
   byId("apiBaseInput").value = session.apiBase || "";
-  byId("authModeInput").value = session.authMode || "bearer";
-  byId("apiTokenInput").value = session.apiToken || "";
-  byId("userIdInput").value = session.userId || "";
-  byId("tenantIdInput").value = session.tenantId || "";
-  byId("roleInput").value = session.role || "admin";
-  byId("csrfInput").value = session.csrfToken || "";
-  byId("confirmInput").value = session.confirmationToken || "";
-  document.body.dataset.authMode = byId("authModeInput").value;
+  byId("usernameInput").value = session.username || session.userId || "";
+  if (document.activeElement !== byId("passwordInput")) byId("passwordInput").value = "";
 }
 
-function handleSessionSubmit(event) {
+async function handleSessionSubmit(event) {
   event.preventDefault();
-  const authMode = byId("authModeInput").value;
-  const session = {
-    apiBase: byId("apiBaseInput").value.trim(),
-    authMode,
-    apiToken: authMode === "bearer" ? byId("apiTokenInput").value.trim() : "",
-    userId: authMode === "gateway" ? byId("userIdInput").value.trim() : "",
-    tenantId: authMode === "gateway" ? byId("tenantIdInput").value.trim() : "",
-    role: authMode === "gateway" ? byId("roleInput").value.trim() : "",
-    csrfToken: authMode === "gateway" ? byId("csrfInput").value.trim() : "",
-    confirmationToken: authMode === "gateway" ? byId("confirmInput").value.trim() : "",
-  };
-  saveSession(session);
-  refreshData();
+  const apiBaseValue = byId("apiBaseInput").value.trim();
+  const username = byId("usernameInput").value.trim();
+  const password = byId("passwordInput").value;
+  if (!username || !password) {
+    setStatus(byId("sessionStatus"), "请输入用户名和密码", "warn");
+    return;
+  }
+  setStatus(byId("sessionStatus"), "登录中", "warn");
+  setConnection("登录中", "warn");
+  try {
+    const login = await loginFetch(apiBaseValue, username, password);
+    if (!valueOf(login, "authenticated") || !valueOf(login, "token")) {
+      throw new Error("登录响应无效");
+    }
+    saveSession({
+      apiBase: apiBaseValue,
+      authMode: "password",
+      apiToken: valueOf(login, "token"),
+      username,
+      userId: valueOf(login, "userId"),
+      tenantId: valueOf(login, "tenantId"),
+      role: valueOf(login, "role"),
+      csrfToken: valueOf(login, "csrfToken"),
+      confirmationToken: valueOf(login, "confirmationToken"),
+      expiresAt: valueOf(login, "expiresAt"),
+    });
+    byId("passwordInput").value = "";
+    setStatus(byId("sessionStatus"), "已登录", "ok");
+    await refreshData();
+  } catch (err) {
+    clearSession();
+    byId("apiBaseInput").value = apiBaseValue;
+    byId("usernameInput").value = username;
+    setConnection("登录失败", "bad");
+    setStatus(byId("sessionStatus"), `登录失败：${err.message}`, "bad");
+  }
 }
 
 function init() {
   loadSession();
   byId("sessionForm").addEventListener("submit", handleSessionSubmit);
-  byId("authModeInput").addEventListener("change", () => {
-    document.body.dataset.authMode = byId("authModeInput").value;
-  });
   byId("refreshButton").addEventListener("click", refreshData);
   byId("disconnectButton").addEventListener("click", clearSession);
   byId("searchInput").addEventListener("input", event => {
@@ -875,6 +971,7 @@ function init() {
     renderAll();
   });
   byId("routeProbeForm").addEventListener("submit", handleRouteProbe);
+  byId("subscriptionForm").addEventListener("submit", handleSubscriptionCreate);
   renderAll();
   refreshData();
 }

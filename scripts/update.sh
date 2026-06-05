@@ -109,6 +109,53 @@ run() {
   "$@"
 }
 
+generate_secret() {
+  if command -v openssl >/dev/null 2>&1; then
+    openssl rand -hex 32
+  elif [ -r /dev/urandom ] && command -v od >/dev/null 2>&1; then
+    od -An -N32 -tx1 /dev/urandom | tr -d ' \n'
+  else
+    die "secure random source unavailable"
+  fi
+}
+
+ensure_admin_password_file() {
+  [ "$DRY_RUN" = "0" ] || return 0
+  if ! grep -q '^MI_PANEL_ADMIN_USER=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_ADMIN_USER=admin\n' >> "$PASSWD_FILE"
+  fi
+  if ! grep -q '^MI_PANEL_ADMIN_PASSWORD=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_ADMIN_PASSWORD=%s\n' "$(generate_secret)" >> "$PASSWD_FILE"
+  fi
+  if ! grep -q '^MI_PANEL_ADMIN_TENANT=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_ADMIN_TENANT=tenant-a\n' >> "$PASSWD_FILE"
+  fi
+  admin_user=$(grep '^MI_PANEL_ADMIN_USER=' "$PASSWD_FILE" | tail -n 1 | sed 's/^MI_PANEL_ADMIN_USER=//')
+  [ -n "$admin_user" ] || admin_user=admin
+  if ! grep -q '^MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN=%s\n' "$(generate_secret)" >> "$PASSWD_FILE"
+  fi
+  if ! grep -q '^MI_PANEL_DEFAULT_SUBSCRIPTION_USER=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_USER=%s\n' "$admin_user" >> "$PASSWD_FILE"
+  fi
+  if ! grep -q '^MI_PANEL_DEFAULT_SUBSCRIPTION_CLIENT=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_CLIENT=sing-box\n' >> "$PASSWD_FILE"
+  fi
+  if ! grep -q '^MI_PANEL_DEFAULT_SUBSCRIPTION_DEVICE=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_DEVICE=default\n' >> "$PASSWD_FILE"
+  fi
+  if ! grep -q '^MI_PANEL_DEFAULT_SUBSCRIPTION_REGION=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_REGION=auto\n' >> "$PASSWD_FILE"
+  fi
+  if ! grep -q '^MI_PANEL_DEFAULT_SUBSCRIPTION_PROTOCOL=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_PROTOCOL=vless\n' >> "$PASSWD_FILE"
+  fi
+  if ! grep -q '^MI_PANEL_DEFAULT_SUBSCRIPTION_OUTBOUND=' "$PASSWD_FILE"; then
+    printf 'MI_PANEL_DEFAULT_SUBSCRIPTION_OUTBOUND=proxy-default\n' >> "$PASSWD_FILE"
+  fi
+  chmod 600 "$PASSWD_FILE"
+}
+
 acquire_lock() {
   [ "$DRY_RUN" = "0" ] || return 0
   mkdir -p "$LOCK_PARENT"
@@ -128,6 +175,7 @@ load_env_file() {
   fi
   [ -n "$PASSWD_FILE" ] || PASSWD_FILE="$INSTALL_DIR/passwd.txt"
   [ -f "$PASSWD_FILE" ] || die "missing $PASSWD_FILE; run scripts/install.sh first"
+  ensure_admin_password_file
   . "$PASSWD_FILE"
   set +a
 }

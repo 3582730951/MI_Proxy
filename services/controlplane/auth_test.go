@@ -83,6 +83,29 @@ func TestSessionCookieRotatesAndUsesSecureFlags(t *testing.T) {
 	}
 }
 
+func TestPasswordHashVerifiesAndRejectsUnsafeValues(t *testing.T) {
+	secret := "correct horse battery staple"
+	hash, err := NewPasswordHash(secret)
+	if err != nil {
+		t.Fatalf("hash password: %v", err)
+	}
+	if strings.Contains(hash, secret) {
+		t.Fatal("password hash contains the raw password")
+	}
+	if !VerifyPasswordHash(hash, secret) {
+		t.Fatal("valid password was rejected")
+	}
+	if VerifyPasswordHash(hash, "wrong password value") {
+		t.Fatal("invalid password was accepted")
+	}
+	if VerifyPasswordHash("bad-format", secret) {
+		t.Fatal("malformed password hash was accepted")
+	}
+	if _, err := NewPasswordHash("short"); err == nil {
+		t.Fatal("short password was accepted")
+	}
+}
+
 func TestPasskeyOriginPublicKeyAndSignatureValidation(t *testing.T) {
 	if err := ValidatePasskeyRPOrigin("example.com", "https://panel.example.com"); err != nil {
 		t.Fatalf("valid passkey origin rejected: %v", err)
