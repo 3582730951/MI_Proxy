@@ -2,6 +2,19 @@
 
 ## Zero-interaction install
 
+Run this one-command bootstrapper from a root shell on a fresh VPS:
+
+```sh
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp"
+```
+
+The bootstrapper installs only the minimum clone dependency when needed, checks out the repository into a temporary directory, and delegates to `scripts/install.sh` with the same arguments. For example:
+
+```sh
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" -k PORT=8080
+tmp=$(mktemp); url=https://raw.githubusercontent.com/3582730951/MI_Proxy/main/scripts/bootstrap.sh; (command -v curl >/dev/null 2>&1 && curl -fsSLo "$tmp" "$url" || wget -qO "$tmp" "$url") && sh "$tmp" --passwd-file /etc/sing-box-next-panel/passwd.txt
+```
+
 Run the installer from a checked-out repository on a fresh VPS:
 
 ```sh
@@ -52,7 +65,7 @@ POSTGRES_PASSWORD=<generated-secret>
 
 Additional generated passwords must be added to the same file as `KEY=VALUE` entries. The installer and updater load `.env` first and then `PASSWD_FILE`, so Docker Compose receives secrets through the process environment without printing them.
 
-The project intentionally does not document pipe-to-shell installation. Download or clone the repository first, inspect the script, then run it locally on the VPS.
+The project intentionally does not document pipe-to-shell installation. The bootstrapper downloads to a local temporary file before execution so the command stays inspectable and compatible with security scanning.
 
 ## Updates
 

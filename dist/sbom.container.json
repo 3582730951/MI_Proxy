@@ -1,7 +1,7 @@
 {
   "name": "sing-box-next-panel",
   "type": "cyclonedx-lite",
-  "generated": "2026-06-05T08:06:07.466739693Z",
+  "generated": "2026-06-05T08:23:36.749381566Z",
   "goVersion": "go1.18.1",
   "components": [
     {

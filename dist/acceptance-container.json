@@ -1,6 +1,6 @@
 {
   "complete": false,
-  "generatedAt": "2026-06-05T08:06:07.765345694Z",
+  "generatedAt": "2026-06-05T08:23:37.110911068Z",
   "items": [
     {
       "category": "environment",
@@ -52,9 +52,9 @@
     },
     {
       "category": "deploy",
-      "name": "Dockerfile, docker-compose without default DB password, localhost-bound service ports, zero-interaction VPS install script with runtime passwd.txt password file, safe auto-update script with configurable password file, health check, and rollback, PostgreSQL schema and indexes",
+      "name": "Dockerfile, docker-compose without default DB password, localhost-bound service ports, one-command bootstrapper, zero-interaction VPS install script with runtime passwd.txt password file, safe auto-update script with configurable password file, health check, and rollback, PostgreSQL schema and indexes",
       "status": "container-test-passed",
-      "evidence": "go test ./tests; Dockerfile; docker-compose.yml; migrations/001_core.sql; scripts/install.sh; scripts/update.sh"
+      "evidence": "go test ./tests; Dockerfile; docker-compose.yml; migrations/001_core.sql; scripts/bootstrap.sh; scripts/install.sh; scripts/update.sh"
     },
     {
       "category": "performance",

@@ -23,6 +23,7 @@ docker run --rm \
     mkdir -p dist
     export CGO_ENABLED=0
     go version
+    sh -n scripts/bootstrap.sh
     sh -n scripts/install.sh
     sh -n scripts/update.sh
     go test ./...

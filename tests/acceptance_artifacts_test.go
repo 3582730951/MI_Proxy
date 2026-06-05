@@ -23,7 +23,9 @@ func TestDeploymentAndDatabaseArtifactsExist(t *testing.T) {
 		"docs/release-gates.md",
 		"internal/safeexec/safeexec.go",
 		"migrations/001_core.sql",
+		"README.md",
 		"schemathesis.toml",
+		"scripts/bootstrap.sh",
 		"scripts/install.sh",
 		"scripts/update.sh",
 		"scripts/release-gate.ps1",
@@ -78,8 +80,43 @@ func TestDeploymentAndDatabaseArtifactsExist(t *testing.T) {
 		}
 	}
 
+	readme := read(t, filepath.Join(root, "README.md"))
+	for _, required := range []string{
+		"MI Proxy VPS",
+		"tmp=$(mktemp)",
+		"scripts/bootstrap.sh",
+		"sh \"$tmp\"",
+		"--passwd-file",
+		"passwd.txt",
+		"sing-box-next-panel-update.timer",
+		"scripts/update.sh",
+		"/healthz",
+	} {
+		if !strings.Contains(readme, required) {
+			t.Fatalf("README missing copy-paste deployment guidance %s", required)
+		}
+	}
+
+	bootstrapScript := read(t, filepath.Join(root, "scripts/bootstrap.sh"))
 	installScript := read(t, filepath.Join(root, "scripts/install.sh"))
 	updateScript := read(t, filepath.Join(root, "scripts/update.sh"))
+	for _, required := range []string{
+		"one-command VPS installs",
+		"install_git_if_missing",
+		"DEBIAN_FRONTEND=noninteractive",
+		"git clone --depth 1",
+		"mktemp -d",
+		"scripts/install.sh",
+		"MI_PANEL_REPO_URL",
+		"MI_PANEL_BRANCH",
+		"MI_PANEL_INSTALL_DIR",
+		"--passwd-file",
+		"PASSWD_FILE",
+	} {
+		if !strings.Contains(bootstrapScript, required) {
+			t.Fatalf("bootstrap script missing one-command deployment feature %s", required)
+		}
+	}
 	for _, required := range []string{
 		"--dry-run",
 		"--skip-deps",
@@ -123,8 +160,8 @@ func TestDeploymentAndDatabaseArtifactsExist(t *testing.T) {
 		t.Fatal("install script must not write generated passwords to .env; use passwd.txt/PASSWD_FILE")
 	}
 	for _, forbidden := range []string{"read -p", "curl | bash", "curl | sh", "| bash", "| sh"} {
-		if strings.Contains(installScript, forbidden) || strings.Contains(updateScript, forbidden) {
-			t.Fatalf("install/update scripts must stay noninteractive and avoid pipe-to-shell pattern %s", forbidden)
+		if strings.Contains(bootstrapScript, forbidden) || strings.Contains(installScript, forbidden) || strings.Contains(updateScript, forbidden) {
+			t.Fatalf("bootstrap/install/update scripts must stay noninteractive and avoid pipe-to-shell pattern %s", forbidden)
 		}
 	}
 

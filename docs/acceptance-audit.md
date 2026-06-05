@@ -48,7 +48,7 @@ This file tracks `docs/plan.md` evidence. The current code covers a local and WS
 - Agent low-resource mode, BBR/sysctl model, structured sysctl/rlimit tuning plan for nofile, somaxconn, tcp_fastopen, and ip_local_port_range, UDP protection limits, systemd watchdog heartbeat model, config diff apply and rollback: `agent`
 - Agent local ring buffer and error-log drain for exception-only reporting: `agent`
 - UI navigation, core metrics visualization, capacity/autoscaling/cost signals, route decision audit drill-down, and dark dashboard style based on `example/imager_1.png`: `apps/web/index.html`
-- Docker deployment, non-root runtime image, Compose deployment without default database password, localhost-bound service ports, zero-interaction VPS installer with generated password file defaulting to runtime `passwd.txt`, and auto-update script with configurable password file, fast-forward pull, health check, and rollback: `Dockerfile`, `docker-compose.yml`, `scripts/install.sh`, `scripts/update.sh`
+- Docker deployment, non-root runtime image, Compose deployment without default database password, localhost-bound service ports, one-command bootstrapper, zero-interaction VPS installer with generated password file defaulting to runtime `passwd.txt`, and auto-update script with configurable password file, fast-forward pull, health check, and rollback: `Dockerfile`, `docker-compose.yml`, `scripts/bootstrap.sh`, `scripts/install.sh`, `scripts/update.sh`
 - PostgreSQL core model and indexes: `migrations/001_core.sql`
 - Local security scan: `go run ./cmd/security-scan`
 - Local dependency license policy scan blocks unknown external dependency licenses and incompatible licenses before release evidence is accepted: `go run ./cmd/license-scan`
