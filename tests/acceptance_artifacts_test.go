@@ -157,6 +157,9 @@ func TestDeploymentAndDatabaseArtifactsExist(t *testing.T) {
 		"git clone",
 		"docker compose",
 		"docker-compose",
+		"docker-compose-plugin",
+		"compose_down_for_legacy_v1",
+		"ContainerConfig",
 		"POSTGRES_PASSWORD",
 		"PASSWD_FILE",
 		"passwd.txt",
@@ -182,6 +185,8 @@ func TestDeploymentAndDatabaseArtifactsExist(t *testing.T) {
 		"would rebuild and restart Docker Compose stack",
 		"rollback_to",
 		"--remove-orphans",
+		"compose_down_for_legacy_v1",
+		"ContainerConfig",
 	} {
 		if !strings.Contains(updateScript, required) {
 			t.Fatalf("update script missing auto-update feature %s", required)

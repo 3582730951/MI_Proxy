@@ -84,6 +84,7 @@ The update script:
 - fetches the configured branch and applies only fast-forward updates;
 - preserves `.env` and Docker volumes;
 - rebuilds and restarts the Compose stack;
+- prefers Docker Compose v2 and, when only legacy Python `docker-compose` 1.x is available, removes old containers before rebuild to avoid the `ContainerConfig` compatibility error while preserving named volumes;
 - checks `/healthz`;
 - rolls back to the previous commit if deployment or health checking fails.
 

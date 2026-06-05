@@ -120,6 +120,7 @@ POSTGRES_PASSWORD=<generated-secret>
 - 使用 `git pull --ff-only`，只接受快进更新；
 - 保留 `.env`、`passwd.txt` 和 Docker volume；
 - 重建并重启 Compose 服务；
+- 如果旧机器只有 Python 版 `docker-compose` 1.x，会先移除旧容器再重建，避免旧安装升级时触发 `ContainerConfig` 兼容错误；命名数据卷会保留；
 - 检查 `/healthz`；
 - 健康检查失败时回滚到上一个 commit。
 

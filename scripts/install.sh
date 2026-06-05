@@ -146,16 +146,26 @@ require_root_for_vps() {
   fi
 }
 
+compose_v2_available() {
+  command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1
+}
+
+compose_legacy_v1_available() {
+  ! compose_v2_available && command -v docker-compose >/dev/null 2>&1
+}
+
 install_packages() {
   [ "$SKIP_DEPS" = "0" ] || return 0
-  if command -v docker >/dev/null 2>&1 && { docker compose version >/dev/null 2>&1 || command -v docker-compose >/dev/null 2>&1; } && command -v git >/dev/null 2>&1; then
+  if command -v docker >/dev/null 2>&1 && compose_v2_available && command -v git >/dev/null 2>&1; then
     return 0
   fi
   if command -v apt-get >/dev/null 2>&1; then
     run env DEBIAN_FRONTEND=noninteractive apt-get update
     run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends ca-certificates git docker.io curl
-    if ! { command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; } && ! command -v docker-compose >/dev/null 2>&1; then
-      run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends docker-compose-plugin || run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends docker-compose
+    if ! compose_v2_available; then
+      run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends docker-compose-plugin || {
+        command -v docker-compose >/dev/null 2>&1 || run env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends docker-compose
+      }
     fi
   elif command -v dnf >/dev/null 2>&1; then
     run dnf install -y ca-certificates git docker curl
@@ -325,12 +335,19 @@ load_env_file() {
 }
 
 compose() {
-  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  if compose_v2_available; then
     run docker compose "$@"
   elif command -v docker-compose >/dev/null 2>&1; then
     run docker-compose "$@"
   else
     die "Docker Compose is unavailable"
+  fi
+}
+
+compose_down_for_legacy_v1() {
+  if compose_legacy_v1_available; then
+    log "legacy docker-compose v1 detected; removing old containers before rebuild to avoid ContainerConfig compatibility errors"
+    compose down --remove-orphans
   fi
 }
 
@@ -342,7 +359,8 @@ start_stack() {
   load_env_file
   old_pwd=$(pwd)
   cd "$INSTALL_DIR"
-  compose up --build -d
+  compose_down_for_legacy_v1
+  compose up --build -d --remove-orphans
   cd "$old_pwd"
 }
 
@@ -390,10 +408,13 @@ write_systemd_units() {
   command -v systemctl >/dev/null 2>&1 || return 0
   [ "$DRY_RUN" = "0" ] || { log "would write systemd service and update timer"; return; }
   docker_bin=$(command -v docker || printf '/usr/bin/docker')
+  compose_start=""
   if "$docker_bin" compose version >/dev/null 2>&1; then
     compose_exec="$docker_bin compose"
+    compose_start="ExecStart=$compose_exec up --build -d --remove-orphans"
   elif command -v docker-compose >/dev/null 2>&1; then
     compose_exec=$(command -v docker-compose)
+    compose_start="ExecStart=/bin/sh -c '$compose_exec down --remove-orphans || true; $compose_exec up --build -d --remove-orphans'"
   else
     die "Docker Compose is unavailable for systemd service registration"
   fi
@@ -408,7 +429,7 @@ Type=oneshot
 WorkingDirectory=$INSTALL_DIR
 EnvironmentFile=$ENV_FILE
 EnvironmentFile=$PASSWD_FILE
-ExecStart=$compose_exec up --build -d
+$compose_start
 ExecStop=$compose_exec down
 RemainAfterExit=yes
 TimeoutStartSec=300

@@ -132,13 +132,28 @@ load_env_file() {
   set +a
 }
 
+compose_v2_available() {
+  command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1
+}
+
+compose_legacy_v1_available() {
+  ! compose_v2_available && command -v docker-compose >/dev/null 2>&1
+}
+
 compose() {
-  if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  if compose_v2_available; then
     run docker compose "$@"
   elif command -v docker-compose >/dev/null 2>&1; then
     run docker-compose "$@"
   else
     die "Docker Compose is unavailable"
+  fi
+}
+
+compose_down_for_legacy_v1() {
+  if compose_legacy_v1_available; then
+    log "legacy docker-compose v1 detected; removing old containers before rebuild to avoid ContainerConfig compatibility errors"
+    compose down --remove-orphans
   fi
 }
 
@@ -164,6 +179,7 @@ deploy_stack() {
   load_env_file
   old_pwd=$(pwd)
   cd "$INSTALL_DIR"
+  compose_down_for_legacy_v1
   compose up --build -d --remove-orphans
   cd "$old_pwd"
 }
