@@ -885,6 +885,15 @@ func TestSubscriptionContextRendersUserDeviceRegionProtocolAndOutboundPolicy(t *
 	if containsSecret(clashContent, token) || containsSecret(clashContent, sub.TokenHash) {
 		t.Fatalf("clash subscription leaked subscription token material: %s", clashContent)
 	}
+	if !strings.Contains(clashContent, "  proxies:\n    - \"warp-pool\"\n    - \"DIRECT\"\n") {
+		t.Fatalf("clash AUTO group proxies are not a valid nested YAML list: %s", clashContent)
+	}
+	if strings.Contains(clashContent, "  proxies:\n    - \"warp-pool\"\n  - DIRECT") {
+		t.Fatalf("clash AUTO group leaked invalid DIRECT indentation: %s", clashContent)
+	}
+	if !strings.Contains(clashContent, "  alpn:\n    - h3\n") {
+		t.Fatalf("clash TUIC alpn list is not correctly indented: %s", clashContent)
+	}
 }
 
 func TestClashMetaSubscriptionRendersImportableProtocolFields(t *testing.T) {
@@ -920,6 +929,9 @@ func TestClashMetaSubscriptionRendersImportableProtocolFields(t *testing.T) {
 			}
 			if strings.Contains(content, "region:") || strings.Contains(content, "device:") || containsSecret(content, token) || containsSecret(content, sub.TokenHash) {
 				t.Fatalf("clash %s rendered unsafe or non-importable content: %s", protocol, content)
+			}
+			if strings.Contains(content, "\n  - DIRECT\n") || strings.Contains(content, "\n  - h3\n") {
+				t.Fatalf("clash %s rendered invalid list indentation: %s", protocol, content)
 			}
 		})
 	}
