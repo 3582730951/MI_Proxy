@@ -83,6 +83,8 @@ Default subscription URL format:
 http://<VPS_PUBLIC_IP>:8080/sub/<MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN>/sing-box
 ```
 
+Subscriptions created from the dashboard expose a user-triggered copy action after creation. The dashboard copies the full subscription URL to the clipboard but does not render the token in page text.
+
 The project intentionally does not document pipe-to-shell installation. The bootstrapper downloads to a local temporary file before execution so the command stays inspectable and compatible with security scanning.
 
 ## Updates

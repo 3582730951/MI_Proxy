@@ -6,6 +6,7 @@ const state = {
   failures: [],
   search: "",
   metricSeries: {},
+  lastSubscriptionLink: "",
 };
 
 const endpoints = {
@@ -187,6 +188,12 @@ function normalizeAPIBase(value) {
   return base.replace(/\/+$/, "");
 }
 
+function absoluteAPIURL(path) {
+  const base = apiBase();
+  if (/^https?:\/\//i.test(base)) return `${base}${path}`;
+  return new URL(`${base}${path}`, location.origin).toString();
+}
+
 function apiBase() {
   return normalizeAPIBase(valueOf(state.session, "apiBase"));
 }
@@ -259,6 +266,15 @@ async function refreshData() {
       state.failures.push(result.reason.message);
     }
   }
+  const unauthorized = state.failures.some(message => String(message).toLowerCase().includes("unauthorized"));
+  if (successCount === 0 && unauthorized) {
+    state.session = null;
+    sessionStorage.removeItem("mi-panel-session");
+    setConnection("登录过期", "bad");
+    byId("lastUpdated").textContent = "登录已过期，请重新登录";
+    renderAll();
+    return;
+  }
   await loadNodeMetricSamples();
   await loadScholarGuard();
   const connected = successCount > 0;
@@ -312,8 +328,26 @@ function renderMetrics() {
   const capacity = state.data.capacity || {};
   const metricGrid = byId("metricGrid");
   if (!metricGrid) return;
+  if (!state.session) {
+    setStatus(byId("healthStatus"), "需要登录", "warn");
+    metricGrid.replaceChildren(
+      metricCard("登录状态", "需要登录", [0]),
+      metricCard("面板地址", apiBase() || location.origin, [0]),
+      metricCard("认证方式", "账号密码", [0]),
+      metricCard("数据状态", "未加载", [0])
+    );
+    return;
+  }
   setStatus(byId("healthStatus"), text(valueOf(overview, "Health", "health"), "未知"), healthTone(valueOf(overview, "Health", "health")));
+  const runtime = state.data.runtime || {};
+  const uptime = valueOf(runtime, "uptimeSeconds", "UptimeSeconds");
+  const rules = normalizeRows(state.data.rules);
+  const subscriptions = normalizeRows(state.data.subscriptions);
   const metrics = [
+    ["生效规则", compactNumber(rules.length)],
+    ["订阅记录", compactNumber(subscriptions.length)],
+    ["VPS 主机", text(valueOf(runtime, "hostname", "Hostname"))],
+    ["控制面运行", uptime === undefined || uptime === null ? "加载中" : duration(uptime)],
     ["在线节点", compactNumber(valueOf(overview, "OnlineNodes", "onlineNodes"))],
     ["离线节点", compactNumber(valueOf(overview, "OfflineNodes", "offlineNodes"))],
     ["告警", compactNumber(valueOf(overview, "Alerts", "alerts"))],
@@ -451,6 +485,14 @@ function renderTrafficMap() {
   const warp = normalizeRows(state.data.warp);
   const map = byId("trafficMap");
   if (!map) return;
+  if (!nodes.length && !warp.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = state.session ? "暂无节点拓扑；Agent 注册后显示实时出口分布" : "登录后加载节点拓扑";
+    map.replaceChildren(empty);
+    byId("mapSummary").textContent = "暂无节点";
+    return;
+  }
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.setAttribute("viewBox", "0 0 1000 520");
   svg.setAttribute("role", "img");
@@ -656,6 +698,9 @@ function renderSubscriptions() {
 async function handleSubscriptionCreate(event) {
   event.preventDefault();
   const out = byId("subscriptionResult");
+  const copyButton = byId("copySubscriptionLinkButton");
+  state.lastSubscriptionLink = "";
+  if (copyButton) copyButton.disabled = true;
   if (!state.session || !state.session.apiToken) {
     out.textContent = "请先登录";
     return;
@@ -670,15 +715,57 @@ async function handleSubscriptionCreate(event) {
   };
   out.textContent = "创建中";
   try {
-    await apiFetch("/api/v1/subscriptions", {
+    const created = await apiFetch("/api/v1/subscriptions", {
       method: "POST",
       body: JSON.stringify(payload),
     });
-    out.textContent = "已创建，token 不在面板显示";
+    const subscription = valueOf(created, "subscription") || {};
+    const token = valueOf(created, "token");
+    const clientType = valueOf(subscription, "clientType", "ClientType") || payload.clientType || "sing-box";
+    if (token) {
+      state.lastSubscriptionLink = absoluteAPIURL(`/sub/${encodeURIComponent(token)}/${encodeURIComponent(clientType)}`);
+      if (copyButton) copyButton.disabled = false;
+      out.textContent = "已创建，可复制订阅链接";
+    } else {
+      out.textContent = "已创建，token 仅在服务端保存";
+    }
     state.data.subscriptions = await apiFetch(endpoints.subscriptions);
     renderSubscriptions();
   } catch (err) {
     out.textContent = err.message;
+  }
+}
+
+async function handleCopySubscriptionLink() {
+  const out = byId("subscriptionResult");
+  if (!state.lastSubscriptionLink) {
+    out.textContent = "请先创建订阅";
+    return;
+  }
+  try {
+    await copyText(state.lastSubscriptionLink);
+    out.textContent = "订阅链接已复制";
+  } catch (err) {
+    out.textContent = `复制失败：${err.message}`;
+  }
+}
+
+async function copyText(value) {
+  if (navigator.clipboard && window.isSecureContext) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "readonly");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    if (!document.execCommand("copy")) throw new Error("浏览器拒绝复制");
+  } finally {
+    textarea.remove();
   }
 }
 
@@ -972,6 +1059,7 @@ function init() {
   });
   byId("routeProbeForm").addEventListener("submit", handleRouteProbe);
   byId("subscriptionForm").addEventListener("submit", handleSubscriptionCreate);
+  byId("copySubscriptionLinkButton").addEventListener("click", handleCopySubscriptionLink);
   renderAll();
   refreshData();
 }

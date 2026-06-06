@@ -266,6 +266,15 @@ canvas {
   height: 328px;
 }
 
+.empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 328px;
+  padding: 18px;
+  color: var(--muted);
+  text-align: center;
+}
+
 .land {
   fill: #26302d;
   stroke: #3c4843;
@@ -416,12 +425,18 @@ pre {
 }
 
 .subscription-form {
-  grid-template-columns: repeat(4, minmax(140px, 1fr)) auto minmax(220px, 1fr);
+  grid-template-columns: repeat(4, minmax(140px, 1fr)) auto auto minmax(220px, 1fr);
 }
 
 .session-grid {
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(3, minmax(180px, 1fr)) auto minmax(220px, 1fr);
   align-items: end;
+}
+
+.session-help {
+  border-color: transparent;
+  color: var(--muted);
+  background: transparent;
 }
 
 label {
@@ -454,6 +469,12 @@ button:focus-visible {
   filter: brightness(1.05);
 }
 
+button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.4);
+  opacity: 0.58;
+}
+
 @media (max-width: 920px) {
   .nav {
     position: static;
@@ -469,6 +490,7 @@ button:focus-visible {
   .topbar,
   .split,
   .tool-row,
+  .session-grid,
   .overview-details,
   .overview-grid {
     grid-template-columns: 1fr;
