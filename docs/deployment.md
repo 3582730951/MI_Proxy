@@ -83,7 +83,9 @@ Default subscription URL format:
 http://<VPS_PUBLIC_IP>:8080/sub/<MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN>/sing-box
 ```
 
-Subscriptions created from the dashboard expose a user-triggered copy action after creation. The dashboard copies the full subscription URL to the clipboard but does not render the token in page text.
+The dashboard overview includes a first-run readiness strip for VPS runtime visibility, loaded rule count, subscription presence, Google Scholar WARP exclusion, and API failure count. Dashboard API errors are redacted before display so subscription paths and Authorization fragments are not reflected in page text.
+
+Subscriptions created from the dashboard expose user-triggered copy actions after creation, both near the create form and on the matching subscription row for the current browser session. The dashboard copies the full subscription URL to the clipboard but does not render the token in page text, and it drops these in-memory copy links after refresh or logout.
 
 The project intentionally does not document pipe-to-shell installation. The bootstrapper downloads to a local temporary file before execution so the command stays inspectable and compatible with security scanning.
 

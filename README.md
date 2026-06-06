@@ -54,7 +54,9 @@ MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN=<generated-secret>
 http://<VPS_PUBLIC_IP>:8080/sub/<MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN>/sing-box
 ```
 
-在面板里手动创建的新订阅，创建成功后可以点“复制订阅链接”。面板只把链接写入剪贴板，不在页面上明文显示 token。
+面板总览会显示开箱检查：VPS 运行信息、生效规则数量、订阅记录、Google Scholar 防 WARP 检查和接口异常摘要。接口错误会在页面上做基础脱敏，避免把订阅路径或 Authorization 片段显示出来。
+
+在面板里手动创建的新订阅，创建成功后可以点“复制订阅链接”。本次创建的订阅也会临时出现在“本次创建的订阅链接”区域和订阅表操作列中，方便再次复制；页面只把链接写入剪贴板，不在页面文本里明文显示 token，刷新或退出登录后不保留这些链接。
 
 项目不使用管道直接执行远程 shell 的安装方式。bootstrap 命令会先把脚本下载到本地临时文件，再执行本地文件。
 

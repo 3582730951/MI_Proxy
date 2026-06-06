@@ -7,6 +7,7 @@ const state = {
   search: "",
   metricSeries: {},
   lastSubscriptionLink: "",
+  recentSubscriptionLinks: [],
 };
 
 const endpoints = {
@@ -128,8 +129,25 @@ function filterRows(rows) {
   return normalizeRows(rows).filter(rowMatchesSearch);
 }
 
+function safeErrorMessage(message) {
+  return String(message || "")
+    .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer <redacted>")
+    .replace(/\/sub\/[A-Za-z0-9._~-]{8,}(\/[A-Za-z0-9._~-]+)?/g, "/sub/<redacted>")
+    .slice(0, 180);
+}
+
+function uniqueFailures() {
+  return [...new Set(state.failures.map(safeErrorMessage).filter(Boolean))];
+}
+
 function renderEmpty(tbody, colspan, message = emptyText) {
-  tbody.innerHTML = `<tr class="empty"><td colspan="${colspan}">${message}</td></tr>`;
+  const row = document.createElement("tr");
+  row.className = "empty";
+  const td = document.createElement("td");
+  td.colSpan = colspan;
+  td.textContent = message;
+  row.appendChild(td);
+  tbody.replaceChildren(row);
 }
 
 function renderRows(tbodyId, rows, colspan, renderRow, emptyMessage = emptyText) {
@@ -178,6 +196,9 @@ function saveSession(session) {
 function clearSession() {
   state.session = null;
   state.data = {};
+  state.failures = [];
+  state.lastSubscriptionLink = "";
+  state.recentSubscriptionLinks = [];
   sessionStorage.removeItem("mi-panel-session");
   renderAll();
 }
@@ -221,7 +242,7 @@ async function loginFetch(base, username, password) {
   const body = contentType.includes("application/json") ? await res.json() : await res.text();
   if (!res.ok) {
     const message = typeof body === "string" ? body.trim() : valueOf(body, "error", "message");
-    throw new Error(message || `${res.status} ${res.statusText}`);
+    throw new Error(safeErrorMessage(message || `${res.status} ${res.statusText}`));
   }
   return body;
 }
@@ -237,7 +258,7 @@ async function apiFetch(path, options = {}) {
   const body = contentType.includes("application/json") ? await res.json() : await res.text();
   if (!res.ok) {
     const message = typeof body === "string" ? body.trim() : JSON.stringify(body);
-    throw new Error(message || `${res.status} ${res.statusText}`);
+    throw new Error(safeErrorMessage(message || `${res.status} ${res.statusText}`));
   }
   return body;
 }
@@ -263,7 +284,7 @@ async function refreshData() {
       state.data[key] = data;
       successCount += 1;
     } else {
-      state.failures.push(result.reason.message);
+      state.failures.push(safeErrorMessage(result.reason.message));
     }
   }
   const unauthorized = state.failures.some(message => String(message).toLowerCase().includes("unauthorized"));
@@ -309,6 +330,25 @@ function setConnection(label, tone) {
   if (!pill) return;
   pill.textContent = label;
   pill.className = `pill ${tone}`.trim();
+}
+
+function renderFailurePill() {
+  const pill = byId("failurePill");
+  if (!pill) return;
+  const failures = uniqueFailures();
+  if (!state.session) {
+    pill.textContent = "登录后检查";
+    pill.className = "pill ghost";
+    return;
+  }
+  if (!failures.length) {
+    pill.textContent = "接口正常";
+    pill.className = "pill ok";
+    return;
+  }
+  pill.textContent = `${failures.length} 个接口异常`;
+  pill.className = "pill warn";
+  pill.title = failures.join("\n");
 }
 
 function metricCard(label, value, series) {
@@ -367,6 +407,48 @@ function renderMetrics() {
     ["成本护栏", text((valueOf(capacity, "CostActions", "costActions") || [])[0])],
   ];
   metricGrid.replaceChildren(...metrics.map(([label, value], index) => metricCard(label, value, metricSeriesFor(label, index))));
+}
+
+function renderReadiness() {
+  const strip = byId("readinessStrip");
+  if (!strip) return;
+  if (!state.session) {
+    strip.replaceChildren(
+      readinessItem("账号登录", "填写 passwd.txt 里的管理员账号密码", "warn"),
+      readinessItem("默认订阅", "默认 token 保存在 VPS 密码文件，不在页面显示", ""),
+      readinessItem("规则验证", "登录后自动检查 Google Scholar 不走 WARP", ""),
+      readinessItem("节点 Agent", "Agent 上线后显示拓扑、资源和端口状态", "")
+    );
+    return;
+  }
+  const rules = normalizeRows(state.data.rules);
+  const subs = normalizeRows(state.data.subscriptions);
+  const runtime = state.data.runtime || {};
+  const scholar = state.data.scholarGuard || {};
+  const scholarOutbound = valueOf(scholar, "Outbound", "outbound");
+  const scholarOK = scholarOutbound && !String(scholarOutbound).toLowerCase().includes("warp");
+  const failures = uniqueFailures();
+  const runtimeOK = Boolean(valueOf(runtime, "hostname", "Hostname") || valueOf(runtime, "os", "OS"));
+  strip.replaceChildren(
+    readinessItem("VPS 信息", runtimeOK ? `已识别 ${text(valueOf(runtime, "hostname", "Hostname"))}` : "运行信息未返回", runtimeOK ? "ok" : "warn"),
+    readinessItem("生效规则", rules.length ? `已加载 ${compactNumber(rules.length)} 条规则` : "未加载到规则，请检查规则种子或 API", rules.length ? "ok" : "warn"),
+    readinessItem("订阅能力", subs.length ? `已有 ${compactNumber(subs.length)} 条订阅记录` : "没有订阅记录，可在下方创建", subs.length ? "ok" : "warn"),
+    readinessItem("Scholar 防 WARP", scholar.error ? scholar.error : scholarOutbound ? `${scholarOutbound}` : "尚未检查", scholar.error ? "bad" : scholarOK ? "ok" : "warn"),
+    readinessItem("接口状态", failures.length ? `${failures.length} 个接口失败，详情见设置` : "全部已加载", failures.length ? "warn" : "ok")
+  );
+}
+
+function readinessItem(label, detail, tone = "") {
+  const item = document.createElement("article");
+  item.className = `check-item ${tone}`.trim();
+  const badgeEl = document.createElement("span");
+  const title = document.createElement("strong");
+  const copy = document.createElement("small");
+  badgeEl.className = "check-dot";
+  title.textContent = label;
+  copy.textContent = text(detail);
+  item.append(badgeEl, title, copy);
+  return item;
 }
 
 function metricSeriesFor(label, index) {
@@ -473,9 +555,12 @@ function renderResourceRings() {
   ];
   rings.replaceChildren(...items.map(([label, value]) => {
     const span = document.createElement("span");
+    const strong = document.createElement("strong");
     const ratio = Math.max(0, Math.min(1, number(value)));
     span.style.setProperty("--ring", `${Math.round(ratio * 100)}%`);
-    span.innerHTML = `${label}<strong>${percent(ratio)}</strong>`;
+    span.textContent = label;
+    strong.textContent = percent(ratio);
+    span.appendChild(strong);
     return span;
   }));
 }
@@ -631,6 +716,73 @@ function routeTraceRow(row) {
   ]);
 }
 
+function subscriptionID(row) {
+  return text(valueOf(row, "ID", "id"), "");
+}
+
+function recentSubscriptionFor(row) {
+  const id = subscriptionID(row);
+  if (!id) return null;
+  return state.recentSubscriptionLinks.find(item => item.id === id) || null;
+}
+
+function rememberSubscriptionLink(subscription, payload, url) {
+  const id = subscriptionID(subscription);
+  const clientType = valueOf(subscription, "clientType", "ClientType") || payload.clientType || "sing-box";
+  const item = {
+    id,
+    url,
+    userId: valueOf(subscription, "userId", "UserID") || payload.userId,
+    deviceId: valueOf(subscription, "deviceId", "DeviceID") || payload.deviceId,
+    clientType,
+    createdAt: new Date().toISOString(),
+  };
+  state.lastSubscriptionLink = url;
+  state.recentSubscriptionLinks = [item, ...state.recentSubscriptionLinks.filter(existing => existing.id !== id)].slice(0, 6);
+}
+
+function copySubscriptionButton(item, label = "复制") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "secondary small-button";
+  button.setAttribute("data-subscription-copy-id", item.id || "latest");
+  button.textContent = label;
+  button.title = "复制订阅链接";
+  button.addEventListener("click", async () => {
+    const out = byId("subscriptionResult");
+    try {
+      await copyText(item.url);
+      out.textContent = "订阅链接已复制";
+    } catch (err) {
+      out.textContent = `复制失败：${err.message}`;
+    }
+  });
+  return button;
+}
+
+function renderRecentSubscriptionLinks() {
+  const container = byId("recentSubscriptionLinks");
+  const summary = byId("recentSubscriptionSummary");
+  if (!container || !summary) return;
+  const items = state.recentSubscriptionLinks.filter(item => item.url);
+  summary.textContent = items.length ? `${items.length} 条可复制` : "未创建";
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-inline";
+    empty.textContent = "新建订阅后，这里会临时显示复制按钮；刷新或退出登录后不保留 token。";
+    container.replaceChildren(empty);
+    return;
+  }
+  container.replaceChildren(...items.map(item => {
+    const row = document.createElement("div");
+    row.className = "link-row";
+    const meta = document.createElement("span");
+    meta.textContent = `${text(item.userId)} / ${text(item.deviceId)} / ${text(item.clientType)} · ${timeAgo(item.createdAt)}`;
+    row.append(meta, copySubscriptionButton(item));
+    return row;
+  }));
+}
+
 function outboundCounts(rows) {
   const counts = {};
   rows.forEach(row => {
@@ -670,21 +822,28 @@ async function handleRouteProbe(event) {
 function renderSubscriptions() {
   const subs = normalizeRows(state.data.subscriptions);
   const conversions = normalizeRows(state.data.conversions);
+  renderRecentSubscriptionLinks();
   byId("subscriptionMetrics").replaceChildren(
     metricCard("有效订阅", compactNumber(subs.filter(row => !valueOf(row, "Revoked", "revoked")).length), [subs.length]),
     metricCard("转换规则", compactNumber(conversions.length), [conversions.length]),
+    metricCard("本次可复制", compactNumber(state.recentSubscriptionLinks.length), [state.recentSubscriptionLinks.length]),
     metricCard("订阅 99p", ms(valueOf(state.data.overview || {}, "Subscription99pMs", "subscription99pMs")), [number(valueOf(state.data.overview || {}, "Subscription99pMs", "subscription99pMs"))])
   );
-  renderRows("subscriptionBody", subs, 8, row => tr([
-    valueOf(row, "UserID", "userId"),
-    valueOf(row, "DeviceID", "deviceId"),
-    valueOf(row, "Region", "region"),
-    valueOf(row, "Protocol", "protocol"),
-    valueOf(row, "OutboundPolicy", "outboundPolicy"),
-    valueOf(row, "ClientType", "clientType"),
-    valueOf(row, "TokenKind", "tokenKind"),
-    valueOf(row, "Revoked", "revoked") ? "已吊销" : "有效",
-  ]), "暂无订阅记录；安装脚本会生成默认订阅，token 只保存在 VPS 密码文件");
+  renderRows("subscriptionBody", subs, 9, row => {
+    const recent = recentSubscriptionFor(row);
+    const action = recent ? copySubscriptionButton(recent) : badge("从 passwd.txt 拼接", "warn");
+    return tr([
+      valueOf(row, "UserID", "userId"),
+      valueOf(row, "DeviceID", "deviceId"),
+      valueOf(row, "Region", "region"),
+      valueOf(row, "Protocol", "protocol"),
+      valueOf(row, "OutboundPolicy", "outboundPolicy"),
+      valueOf(row, "ClientType", "clientType"),
+      valueOf(row, "TokenKind", "tokenKind"),
+      valueOf(row, "Revoked", "revoked") ? "已吊销" : "有效",
+      action,
+    ]);
+  }, "暂无订阅记录；安装脚本会生成默认订阅，token 只保存在 VPS 密码文件");
   renderRows("conversionBody", conversions, 6, row => tr([
     valueOf(row, "name", "Name"),
     valueOf(row, "sourceClientType", "SourceClientType"),
@@ -723,13 +882,19 @@ async function handleSubscriptionCreate(event) {
     const token = valueOf(created, "token");
     const clientType = valueOf(subscription, "clientType", "ClientType") || payload.clientType || "sing-box";
     if (token) {
-      state.lastSubscriptionLink = absoluteAPIURL(`/sub/${encodeURIComponent(token)}/${encodeURIComponent(clientType)}`);
+      const link = absoluteAPIURL(`/sub/${encodeURIComponent(token)}/${encodeURIComponent(clientType)}`);
+      rememberSubscriptionLink(subscription, payload, link);
       if (copyButton) copyButton.disabled = false;
       out.textContent = "已创建，可复制订阅链接";
     } else {
       out.textContent = "已创建，token 仅在服务端保存";
     }
-    state.data.subscriptions = await apiFetch(endpoints.subscriptions);
+    try {
+      state.data.subscriptions = await apiFetch(endpoints.subscriptions);
+    } catch (err) {
+      state.failures.push(safeErrorMessage(err.message));
+      out.textContent = token ? "已创建，可复制订阅链接；列表刷新失败" : "已创建；列表刷新失败";
+    }
     renderSubscriptions();
   } catch (err) {
     out.textContent = err.message;
@@ -738,12 +903,13 @@ async function handleSubscriptionCreate(event) {
 
 async function handleCopySubscriptionLink() {
   const out = byId("subscriptionResult");
-  if (!state.lastSubscriptionLink) {
+  if (!state.lastSubscriptionLink && !state.recentSubscriptionLinks.length) {
     out.textContent = "请先创建订阅";
     return;
   }
   try {
-    await copyText(state.lastSubscriptionLink);
+    const item = state.recentSubscriptionLinks[0] || { url: state.lastSubscriptionLink };
+    await copyText(item.url);
     out.textContent = "订阅链接已复制";
   } catch (err) {
     out.textContent = `复制失败：${err.message}`;
@@ -986,7 +1152,9 @@ function renderAll() {
   document.body.classList.toggle("needs-session", !hasSession);
   fillSessionForm();
   setStatus(byId("sessionStatus"), hasSession ? "已登录" : "需要登录", hasSession ? "ok" : "warn");
+  renderFailurePill();
   renderMetrics();
+  renderReadiness();
   renderOverviewPanels();
   renderNodes();
   renderRoutes();
@@ -1036,6 +1204,8 @@ async function handleSessionSubmit(event) {
       confirmationToken: valueOf(login, "confirmationToken"),
       expiresAt: valueOf(login, "expiresAt"),
     });
+    state.lastSubscriptionLink = "";
+    state.recentSubscriptionLinks = [];
     byId("passwordInput").value = "";
     setStatus(byId("sessionStatus"), "已登录", "ok");
     await refreshData();

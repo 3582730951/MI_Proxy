@@ -30,6 +30,7 @@
         <small id="lastUpdated">等待登录后加载数据</small>
       </div>
       <div id="connectionPill" class="pill warn">未连接</div>
+      <div id="failurePill" class="pill ghost">接口待检查</div>
       <label class="search"><span>搜索</span><input id="searchInput" autocomplete="off" placeholder="节点 / 地区 / 域名 / IP"></label>
       <button id="refreshButton" type="button" title="刷新数据">刷新</button>
       <button id="disconnectButton" type="button" title="退出登录">退出</button>
@@ -52,6 +53,7 @@
     <section id="overview" class="band">
       <header class="toolbar"><h1>总览</h1><div id="healthStatus" class="status">未知</div></header>
       <div id="metricGrid" class="metric-grid"></div>
+      <div id="readinessStrip" class="readiness-strip" aria-label="开箱检查"></div>
       <div class="overview-grid">
         <section class="panel topology">
           <header class="panel-head"><h2>全局流量拓扑</h2><span id="mapSummary"></span></header>
@@ -108,7 +110,11 @@
         <button id="copySubscriptionLinkButton" type="button" disabled>复制订阅链接</button>
         <output id="subscriptionResult">创建后可复制链接</output>
       </form>
-      <div class="table-wrap"><table><thead><tr><th>用户</th><th>设备</th><th>地区</th><th>协议</th><th>出口策略</th><th>客户端</th><th>令牌类型</th><th>状态</th></tr></thead><tbody id="subscriptionBody"></tbody></table></div>
+      <section class="panel recent-subscriptions">
+        <header class="panel-head"><h2>本次创建的订阅链接</h2><span id="recentSubscriptionSummary">未创建</span></header>
+        <div id="recentSubscriptionLinks" class="link-list"></div>
+      </section>
+      <div class="table-wrap"><table><thead><tr><th>用户</th><th>设备</th><th>地区</th><th>协议</th><th>出口策略</th><th>客户端</th><th>令牌类型</th><th>状态</th><th>操作</th></tr></thead><tbody id="subscriptionBody"></tbody></table></div>
       <section class="panel"><h2>订阅转换</h2><div class="table-wrap"><table><thead><tr><th>名称</th><th>源客户端</th><th>目标客户端</th><th>地区</th><th>协议</th><th>状态</th></tr></thead><tbody id="conversionBody"></tbody></table></div></section>
     </section>
 
