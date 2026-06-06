@@ -81,6 +81,7 @@ Default subscription URL format:
 
 ```text
 http://<VPS_PUBLIC_IP>:8080/sub/<MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN>/sing-box
+http://<VPS_PUBLIC_IP>:8080/sub/<MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN>/clash-meta
 ```
 
 The dashboard overview includes a first-run readiness strip for VPS runtime visibility, loaded rule count, subscription presence, Google Scholar WARP exclusion, and API failure count. Dashboard API errors are redacted before display so subscription paths and Authorization fragments are not reflected in page text.

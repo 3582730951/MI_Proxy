@@ -4426,7 +4426,7 @@ func renderClientSubscription(clientType string, sub Subscription) string {
 		data, _ := json.Marshal(payload)
 		return string(data)
 	case "clash", "clash-meta":
-		return fmt.Sprintf("proxies:\n- name: %s\n  type: %s\n  region: %s\n  device: %s\nproxy-groups:\n- name: AUTO\n  type: select\n  proxies: [%s]\nrules:\n- IP-CIDR,10.0.0.0/8,DIRECT,no-resolve\n- GEOSITE,cn,DIRECT\n- GEOIP,CN,DIRECT\n- DOMAIN-SUFFIX,scholar.google.com,proxy-default\n- RULE-SET,warp-include,%s\n- MATCH,%s\n", outboundPolicy, protocol, region, deviceID, outboundPolicy, outboundPolicy, outboundPolicy)
+		return renderClashMetaSubscription(sub, protocol, outboundPolicy)
 	case "shadowrocket":
 		return fmt.Sprintf("%s://%s@example.invalid:443?security=tls&region=%s&device=%s#%s", protocol, outboundPolicy, region, deviceID, outboundPolicy)
 	case "v2rayn":
@@ -4437,6 +4437,166 @@ func renderClientSubscription(clientType string, sub Subscription) string {
 	default:
 		return outboundPolicy
 	}
+}
+
+func renderClashMetaSubscription(sub Subscription, protocol, outboundPolicy string) string {
+	const (
+		serverName = "example.invalid"
+		tlsSNI     = "addons.mozilla.org"
+		serverPort = 443
+	)
+	proxyName := nonEmpty(outboundPolicy, "proxy-default")
+	password := subscriptionClientSecret(sub, "clash-password")
+	uuid := subscriptionClientUUID(sub, "clash-uuid")
+	var b strings.Builder
+	b.WriteString("mixed-port: 7890\n")
+	b.WriteString("allow-lan: false\n")
+	b.WriteString("mode: rule\n")
+	b.WriteString("log-level: warning\n")
+	b.WriteString("ipv6: true\n")
+	b.WriteString("unified-delay: true\n\n")
+	b.WriteString("proxies:\n")
+	writeClashProxy(&b, proxyName, protocol, serverName, serverPort, uuid, password, tlsSNI)
+	b.WriteString("proxy-groups:\n")
+	if proxyName != "proxy-default" {
+		b.WriteString("- name: \"proxy-default\"\n")
+		b.WriteString("  type: select\n")
+		b.WriteString("  proxies:\n")
+		writeYAMLListString(&b, 4, proxyName)
+	}
+	b.WriteString("- name: \"AUTO\"\n")
+	b.WriteString("  type: select\n")
+	b.WriteString("  proxies:\n")
+	writeYAMLListString(&b, 4, proxyName)
+	b.WriteString("  - DIRECT\n\n")
+	b.WriteString("rule-providers:\n")
+	b.WriteString("  warp-include:\n")
+	b.WriteString("    type: inline\n")
+	b.WriteString("    behavior: domain\n")
+	b.WriteString("    payload:\n")
+	b.WriteString("      - '+.example-warp-target.com'\n\n")
+	b.WriteString("rules:\n")
+	for _, rule := range []string{
+		"IP-CIDR,10.0.0.0/8,DIRECT,no-resolve",
+		"IP-CIDR,172.16.0.0/12,DIRECT,no-resolve",
+		"IP-CIDR,192.168.0.0/16,DIRECT,no-resolve",
+		"IP-CIDR,127.0.0.0/8,DIRECT,no-resolve",
+		"GEOSITE,cn,DIRECT",
+		"GEOIP,CN,DIRECT",
+		"DOMAIN-SUFFIX,scholar.google.com,proxy-default",
+		"DOMAIN-SUFFIX,scholar.googleusercontent.com,proxy-default",
+		"DOMAIN-SUFFIX,citations.google.com,proxy-default",
+		fmt.Sprintf("RULE-SET,warp-include,%s", proxyName),
+		fmt.Sprintf("MATCH,%s", proxyName),
+	} {
+		b.WriteString("- ")
+		b.WriteString(rule)
+		b.WriteByte('\n')
+	}
+	return b.String()
+}
+
+func writeClashProxy(b *strings.Builder, name, protocol, server string, port int, uuid, password, sni string) {
+	b.WriteString("- name: ")
+	b.WriteString(yamlQuote(name))
+	b.WriteByte('\n')
+	b.WriteString("  type: ")
+	b.WriteString(protocol)
+	b.WriteByte('\n')
+	b.WriteString("  server: ")
+	b.WriteString(yamlQuote(server))
+	b.WriteByte('\n')
+	b.WriteString("  port: ")
+	b.WriteString(strconv.Itoa(port))
+	b.WriteByte('\n')
+	b.WriteString("  udp: true\n")
+	switch protocol {
+	case "hysteria2":
+		b.WriteString("  password: ")
+		b.WriteString(yamlQuote(password))
+		b.WriteByte('\n')
+		b.WriteString("  sni: ")
+		b.WriteString(yamlQuote(sni))
+		b.WriteByte('\n')
+		b.WriteString("  skip-cert-verify: true\n")
+		b.WriteString("  up: \"200 Mbps\"\n")
+		b.WriteString("  down: \"1000 Mbps\"\n")
+	case "tuic":
+		b.WriteString("  uuid: ")
+		b.WriteString(yamlQuote(uuid))
+		b.WriteByte('\n')
+		b.WriteString("  password: ")
+		b.WriteString(yamlQuote(password))
+		b.WriteByte('\n')
+		b.WriteString("  alpn:\n")
+		b.WriteString("  - h3\n")
+		b.WriteString("  reduce-rtt: true\n")
+		b.WriteString("  request-timeout: 8000\n")
+		b.WriteString("  udp-relay-mode: native\n")
+		b.WriteString("  congestion-controller: bbr\n")
+		b.WriteString("  sni: ")
+		b.WriteString(yamlQuote(sni))
+		b.WriteByte('\n')
+		b.WriteString("  skip-cert-verify: true\n")
+	case "trojan":
+		b.WriteString("  password: ")
+		b.WriteString(yamlQuote(password))
+		b.WriteByte('\n')
+		b.WriteString("  sni: ")
+		b.WriteString(yamlQuote(sni))
+		b.WriteByte('\n')
+		b.WriteString("  skip-cert-verify: true\n")
+	case "vmess":
+		b.WriteString("  uuid: ")
+		b.WriteString(yamlQuote(uuid))
+		b.WriteByte('\n')
+		b.WriteString("  alterId: 0\n")
+		b.WriteString("  cipher: auto\n")
+		b.WriteString("  tls: true\n")
+		b.WriteString("  servername: ")
+		b.WriteString(yamlQuote(sni))
+		b.WriteByte('\n')
+		b.WriteString("  network: tcp\n")
+	default:
+		b.WriteString("  uuid: ")
+		b.WriteString(yamlQuote(uuid))
+		b.WriteByte('\n')
+		b.WriteString("  tls: true\n")
+		b.WriteString("  servername: ")
+		b.WriteString(yamlQuote(sni))
+		b.WriteByte('\n')
+		b.WriteString("  client-fingerprint: firefox\n")
+		b.WriteString("  network: tcp\n")
+	}
+}
+
+func yamlQuote(value string) string {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return `""`
+	}
+	return string(data)
+}
+
+func writeYAMLListString(b *strings.Builder, indent int, value string) {
+	b.WriteString(strings.Repeat(" ", indent))
+	b.WriteString("- ")
+	b.WriteString(yamlQuote(value))
+	b.WriteByte('\n')
+}
+
+func subscriptionClientSecret(sub Subscription, purpose string) string {
+	sum := sha256.Sum256([]byte("subscription-client-secret-v1\x00" + purpose + "\x00" + sub.ID + "\x00" + sub.TenantID + "\x00" + sub.UserID))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func subscriptionClientUUID(sub Subscription, purpose string) string {
+	sum := sha256.Sum256([]byte("subscription-client-uuid-v1\x00" + purpose + "\x00" + sub.ID + "\x00" + sub.TenantID + "\x00" + sub.UserID))
+	raw := sum[:16]
+	raw[6] = (raw[6] & 0x0f) | 0x40
+	raw[8] = (raw[8] & 0x3f) | 0x80
+	hexed := hex.EncodeToString(raw)
+	return hexed[0:8] + "-" + hexed[8:12] + "-" + hexed[12:16] + "-" + hexed[16:20] + "-" + hexed[20:32]
 }
 
 func normalizeSubscriptionProtocol(protocol string) string {

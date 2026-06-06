@@ -58,6 +58,8 @@ http://<VPS_PUBLIC_IP>:8080/sub/<MI_PANEL_DEFAULT_SUBSCRIPTION_TOKEN>/sing-box
 
 在面板里手动创建的新订阅，创建成功后可以点“复制订阅链接”。本次创建的订阅也会临时出现在“本次创建的订阅链接”区域和订阅表操作列中，方便再次复制；页面只把链接写入剪贴板，不在页面文本里明文显示 token，刷新或退出登录后不保留这些链接。
 
+`/sub/<token>/clash-meta` 会返回完整 Clash/Mihomo 配置，而不是只返回半截 proxy 列表。输出包含 `proxies`、`proxy-groups`、`rule-providers` 和 `rules`，并为 VLESS、VMess、Hysteria2、TUIC、Trojan 写入 Clash/Mihomo 可识别的连接字段；订阅 token 和 token hash 不会写入配置内容。
+
 项目不使用管道直接执行远程 shell 的安装方式。bootstrap 命令会先把脚本下载到本地临时文件，再执行本地文件。
 
 ## 常用复制命令

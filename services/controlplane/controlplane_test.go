@@ -872,10 +872,56 @@ func TestSubscriptionContextRendersUserDeviceRegionProtocolAndOutboundPolicy(t *
 	if err != nil {
 		t.Fatalf("render clash contextual subscription: %v", err)
 	}
-	for _, want := range []string{"type: tuic", "region: HK", "device: phone-01", "proxies: [warp-pool]", "GEOSITE,cn,DIRECT", "DOMAIN-SUFFIX,scholar.google.com,proxy-default", "RULE-SET,warp-include,warp-pool"} {
+	for _, want := range []string{"mixed-port: 7890", "type: tuic", "server: \"example.invalid\"", "port: 443", "uuid:", "password:", "alpn:", "congestion-controller: bbr", "rule-providers:", "type: inline", "payload:", "GEOSITE,cn,DIRECT", "DOMAIN-SUFFIX,scholar.google.com,proxy-default", "RULE-SET,warp-include,warp-pool"} {
 		if !strings.Contains(clashContent, want) {
 			t.Fatalf("clash subscription missing %q: %s", want, clashContent)
 		}
+	}
+	for _, forbidden := range []string{"region: HK", "device: phone-01", "proxies: [warp-pool]"} {
+		if strings.Contains(clashContent, forbidden) {
+			t.Fatalf("clash subscription still contains non-importable field %q: %s", forbidden, clashContent)
+		}
+	}
+	if containsSecret(clashContent, token) || containsSecret(clashContent, sub.TokenHash) {
+		t.Fatalf("clash subscription leaked subscription token material: %s", clashContent)
+	}
+}
+
+func TestClashMetaSubscriptionRendersImportableProtocolFields(t *testing.T) {
+	now := time.Date(2026, 6, 3, 12, 0, 0, 0, time.UTC)
+	cp := New(func() time.Time { return now })
+	ctx := adminCtx("tenant-a")
+	cases := map[string][]string{
+		"vless":     {"type: vless", "uuid:", "tls: true", "servername:", "client-fingerprint: firefox"},
+		"vmess":     {"type: vmess", "uuid:", "alterId: 0", "cipher: auto", "tls: true"},
+		"hysteria2": {"type: hysteria2", "password:", "sni:", "skip-cert-verify: true", "up: \"200 Mbps\"", "down: \"1000 Mbps\""},
+		"tuic":      {"type: tuic", "uuid:", "password:", "alpn:", "udp-relay-mode: native", "congestion-controller: bbr"},
+		"trojan":    {"type: trojan", "password:", "sni:", "skip-cert-verify: true"},
+	}
+	for protocol, wants := range cases {
+		t.Run(protocol, func(t *testing.T) {
+			sub, token, err := cp.CreateSubscriptionWithOptions(ctx, "tenant-a", "user-"+protocol, "clash-meta", "policy-1", now.Add(time.Hour), SubscriptionOptions{
+				TokenKind:      "long",
+				Scope:          "read",
+				Protocol:       protocol,
+				OutboundPolicy: "proxy-default",
+			})
+			if err != nil {
+				t.Fatalf("create subscription: %v", err)
+			}
+			content, err := cp.RenderSubscription(token, "clash-meta", "198.51.100.46")
+			if err != nil {
+				t.Fatalf("render clash %s: %v", protocol, err)
+			}
+			for _, want := range append([]string{"proxies:", "proxy-groups:", "rules:", "server: \"example.invalid\"", "port: 443", "MATCH,proxy-default"}, wants...) {
+				if !strings.Contains(content, want) {
+					t.Fatalf("clash %s missing %q: %s", protocol, want, content)
+				}
+			}
+			if strings.Contains(content, "region:") || strings.Contains(content, "device:") || containsSecret(content, token) || containsSecret(content, sub.TokenHash) {
+				t.Fatalf("clash %s rendered unsafe or non-importable content: %s", protocol, content)
+			}
+		})
 	}
 }
 
